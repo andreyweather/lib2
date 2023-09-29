@@ -796,6 +796,8 @@ object EnkodPushLibrary {
         })
     }
 
+
+
     private fun getSessionId(ctx: Context) {
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         sessionId = preferences.getString(SESSION_ID_TAG, null)
@@ -807,6 +809,7 @@ object EnkodPushLibrary {
             getFirebaseToken(ctx)
         }
     }
+
 
     private fun getFirebaseToken(context: Context) {
         FirebaseMessaging.getInstance().apply {

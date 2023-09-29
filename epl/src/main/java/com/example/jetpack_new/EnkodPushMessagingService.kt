@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import com.example.jetpack_new.BuildConfig
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
@@ -14,26 +15,24 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class MyFirebaseInstanceIDService : FirebaseMessagingService() {
-
+internal class EnkodPushMessagingService: FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-
-        val token = FirebaseMessaging.getInstance().getToken();
+        EnkodPushLibrary.onNewToken(applicationContext, token)
     }
 
-    override fun onMessageReceived(remoteMessage: RemoteMessage) {
+    override fun onDeletedMessages() {
+        EnkodPushLibrary.onDeletedMessage()
+    }
 
-        if (remoteMessage.getNotification() != null) {
-
-            enkodConnect("andrey_p_client", "good.pogodin1@enkod.ru").start(this)
-
-        }
+    override fun onMessageReceived(message: RemoteMessage) {
+        //super.onMessageReceived(message)
+        EnkodPushLibrary.processMessage(applicationContext, message)
+        Toast.makeText(applicationContext, message.toString(), Toast.LENGTH_SHORT).show()
     }
 }
-
-class enkodConnect(_account: String, _email: String) : Activity() {
+class enkodConnect (_account: String, _email: String) : Activity() {
 
     val account: String
     val email: String
@@ -43,13 +42,7 @@ class enkodConnect(_account: String, _email: String) : Activity() {
         email = _email
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-
-    }
-
-    fun start(context: Context) {
+    fun push (context: Context) {
         FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w(ContentValues.TAG, "Fetching FCM registration token failed", task.exception)
@@ -58,7 +51,7 @@ class enkodConnect(_account: String, _email: String) : Activity() {
 
             // Get new FCM registration token
             val token = task.result
-
+            Log.d("go", "go")
             Log.d("token", token)
         })
 
@@ -81,7 +74,7 @@ class enkodConnect(_account: String, _email: String) : Activity() {
             EnkodPushLibrary.Subscriber().Subscribe(
                 context, SubscriberInfo(
                     email,
-                    "8906118345",
+                    "",
                     "",
                     "",
                     anyArray,
@@ -93,3 +86,4 @@ class enkodConnect(_account: String, _email: String) : Activity() {
         }
     }
 }
+

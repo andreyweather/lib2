@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "jetpack-new"
 include(":app")
-include(":jetpack-new")
+include(":epl")
