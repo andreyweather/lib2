@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.jetpack_new"
+    namespace = "com.example.jetpack_new1"
     compileSdk = 33
 
     defaultConfig {
