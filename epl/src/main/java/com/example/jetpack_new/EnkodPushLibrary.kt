@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -22,12 +23,17 @@ import com.example.jetpack_new_1.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
 import java.lang.reflect.Type
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -41,8 +47,7 @@ object EnkodPushLibrary {
 
     internal val CHANEL_Id = "enkod_lib_1"
     internal val notificationId = 1
-    var exit = 0
-    var exitSelf = 0
+
 
 
     internal lateinit var soundOn: String
@@ -58,7 +63,7 @@ object EnkodPushLibrary {
     internal lateinit var channelId: String
     internal lateinit var notificationImage: String
     internal lateinit var bigImageUrl: String
-    internal var url: String = "url"
+    internal lateinit var url: String
     internal lateinit var title: String
     internal lateinit var body: String
     internal lateinit var notificationImportance: String
@@ -68,7 +73,8 @@ object EnkodPushLibrary {
     internal lateinit var personId: String
     internal lateinit var messageId: String
     internal lateinit var account: String
-
+    private lateinit var email: String
+    private lateinit var phone: String
 
     internal val vibrationPattern = longArrayOf(1500, 500)
     internal val defaultIconId: Int = R.drawable.ic_android_black_24dp
@@ -84,7 +90,6 @@ object EnkodPushLibrary {
 
     private lateinit var retrofit: Api
     private lateinit var client: OkHttpClient
-
 
     // класс необходим для правильной работы библиотеки retrofit
 
@@ -109,7 +114,6 @@ object EnkodPushLibrary {
 
     enum class OpenIntent {
         DYNAMIC_LINK, OPEN_URL, OPEN_APP;
-
         fun get(): String {
             Log.d("Library", "get")
             return when (this) {
@@ -132,27 +136,10 @@ object EnkodPushLibrary {
         }
     }
 
-    fun initLateInit(context: Context) {
-        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-
-        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
-        var preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        var preferencesToken = preferences.getString(TOKEN_TAG, null)
-
-
-        this.sessionId = preferencesSessionId!!
-        this.token = preferencesToken!!
-        this.account = preferencesAcc!!
-    }
-
     // данная функция (init) производит инициализацию библиотеки - запускает необходимые функции
 
     @SuppressLint("SuspiciousIndentation")
-    internal fun init(
-        ctx: Context,
-        account: String,
-        firebaseIndicator: Int
-    ) {
+    internal fun init(ctx: Context, account: String, _email: String?, _phone: String?, firebaseIndicator: Int) {
 
         initRetrofit()
         setClientName(ctx, account)
@@ -161,6 +148,13 @@ object EnkodPushLibrary {
         var preferencesToken: String? = ""
 
 
+        if (_email != null) {
+            email= _email
+        }else email = ""
+
+        if (_phone != null) {
+            phone = _phone
+        }else phone = ""
 
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
@@ -171,6 +165,7 @@ object EnkodPushLibrary {
         this.sessionId = preferencesSessionId
         this.token = preferencesToken
 
+        Log.d ("session_token", "$sessionId, $token")
 
         if (firebaseIndicator == 0 && preferencesSessionId.isNullOrEmpty()) {
             getSessionIdFromApi(ctx)
@@ -185,7 +180,7 @@ object EnkodPushLibrary {
 
     // функция (initRetrofit) инициализации библиотеки retrofit - выполняющую http запросы
 
-    fun initRetrofit() {
+     fun initRetrofit() {
         Log.d("Library", "initRetrofit")
         client = OkHttpClient.Builder()
             .callTimeout(60L, TimeUnit.SECONDS)
@@ -209,7 +204,6 @@ object EnkodPushLibrary {
             .client(client)
             .build()
             .create(Api::class.java)
-
     }
 
     /* данная функция (getToken) получает информацию о текущем токене. Если текущей токен не равен
@@ -221,7 +215,7 @@ object EnkodPushLibrary {
 
     internal fun getToken(ctx: Context, token: String?) {
 
-        Log.d("Library", "getToken")
+        Log.d ("Library", "getToken")
 
         var preferencesSessionId: String? = ""
         var preferencesToken: String? = ""
@@ -229,13 +223,13 @@ object EnkodPushLibrary {
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
         preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        preferencesToken = preferences.getString(TOKEN_TAG, null)
+        preferencesToken = preferences.getString(SESSION_ID_TAG, null)
 
         this.sessionId = preferencesSessionId
         this.token = preferencesToken
 
 
-        if (this.token != token) {
+         if (this.token != token) {
 
             val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
             preferences.edit()
@@ -259,7 +253,7 @@ object EnkodPushLibrary {
 
     private fun getSessionIdFromApi(ctx: Context) {
 
-        Log.d("Library", "getSessionIdFromApi")
+        Log.d ("Library", "getSessionIdFromApi")
 
         retrofit.getSessionId(getClientName()).enqueue(object : Callback<SessionIdResponse> {
             override fun onResponse(
@@ -301,7 +295,6 @@ object EnkodPushLibrary {
         preferences.edit()
             .putString(SESSION_ID_TAG, nsession)
             .apply()
-
         this.sessionId = nsession
 
         Log.d("session", this.sessionId.toString())
@@ -309,8 +302,6 @@ object EnkodPushLibrary {
 
         if (newPreferencesToken.isNullOrEmpty()) {
             subscribeToPush {}
-            updateTokenReload(ctx, nsession, newPreferencesToken)
-
         } else updateToken(ctx, nsession, newPreferencesToken)
 
     }
@@ -336,6 +327,7 @@ object EnkodPushLibrary {
             ) {
                 logInfo("token updated")
                 newTokenCallback(token!!)
+                //subscribeToPush {}
                 startSession()
             }
 
@@ -346,64 +338,34 @@ object EnkodPushLibrary {
         })
     }
 
-
-    fun updateTokenReload(ctx: Context, session: String?, token: String?) {
-
-        Log.d("updateToken", "updateToken")
-        retrofit.updateToken(
-            getClientName(),
-            getSession(),
-            SubscribeBody(
-                sessionId = session!!,
-                token = token!!
-            )
-        ).enqueue(object : Callback<UpdateTokenResponse> {
-            override fun onResponse(
-                call: Call<UpdateTokenResponse>,
-                response: Response<UpdateTokenResponse>
-            ) {
-                logInfo("token updated")
-                newTokenCallback(token!!)
-
-            }
-
-            override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
-                logInfo("token update failure")
-            }
-
-        })
-    }
-
-
     private fun startSession() {
         var tokenSession = ""
         if (!this.token.isNullOrEmpty()) {
             tokenSession = this.token!!
         }
-        Log.d("start_session", "yes ${this.token}")
+        Log.d ("start_session", "yes ${this.token}")
         tokenSession?.let {
             logInfo("on start session \n")
             sessionId?.let { it1 ->
-                retrofit.startSession(it1, getClientName())
-                    .enqueue(object : Callback<SessionIdResponse> {
-                        override fun onResponse(
-                            call: Call<SessionIdResponse>,
-                            response: Response<SessionIdResponse>
-                        ) {
-                            logInfo("session started ${response.body()?.session_id}")
-                            //isSessionStarted = true
-                            newTokenCallback(it)
-                            subscribeToPush {}
-                        }
-
-                        override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
-                            logInfo("session not started ${t.message}")
-                            newTokenCallback(it)
-                        }
-                    })
+                retrofit.startSession(it1, getClientName()).enqueue(object : Callback<SessionIdResponse> {
+                    override fun onResponse(
+                        call: Call<SessionIdResponse>,
+                        response: Response<SessionIdResponse>
+                    ) {
+                        logInfo("session started ${response.body()?.session_id}")
+                        //isSessionStarted = true
+                        newTokenCallback(it)
+                        subscribeToPush {}
+                    }
+                    override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
+                        logInfo("session not started ${t.message}")
+                        newTokenCallback(it)
+                    }
+                })
             }
         }
     }
+
 
 
     //  функция (subscribeToPush) подключает контакт к push уведомлениям.
@@ -443,63 +405,49 @@ object EnkodPushLibrary {
 
     // функция (addContact) создания и добавления нового контакта на сервис
 
-    fun addContact(email: String = "", phone: String = "", extrafileds: Map<String, String>? = null) {
+        fun addContact(email: String, extrafileds: Map<String,String>? = null ) {
 
+            Log.d("", "addContact")
 
-        val req = JsonObject()
+            val req = JsonObject()
 
-
-        if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
             req.add("mainChannel", Gson().toJsonTree("email"))
-        } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
-            req.add("mainChannel", Gson().toJsonTree("email"))
-        } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-            req.add("mainChannel", Gson().toJsonTree("phone"))
-        }
+
+            val fileds = JsonObject()
 
 
+            if (!extrafileds.isNullOrEmpty()) {
+                val keys = extrafileds.keys
 
-        val fileds = JsonObject()
+                for (i in 0 until keys.size) {
 
-
-        if (!extrafileds.isNullOrEmpty()) {
-            val keys = extrafileds.keys
-
-            for (i in 0 until keys.size) {
-
-                fileds.addProperty(keys.elementAt(i), extrafileds.getValue(keys.elementAt(i)))
+                    fileds.addProperty(keys.elementAt(i),extrafileds.getValue(keys.elementAt(i)))
+                }
             }
-        }
-
-        if (!email.isNullOrEmpty()) {
             fileds.addProperty("email", email)
-        }
 
-        if (!phone.isNullOrEmpty()) {
-            fileds.addProperty("phone", phone)
-        }
+            req.add("fields", fileds)
 
-        req.add("fields", fileds)
+            retrofit.subscribe(
+                getClientName(),
+                sessionId!!,
+                req
 
-        retrofit.subscribe(
-            getClientName(),
-            sessionId!!,
-            req
+            ).enqueue(object : Callback<Unit> {
+                override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
+                    val msg = "ok"
+                    Log.d("succes", msg)
+                }
 
-        ).enqueue(object : Callback<Unit> {
-            override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-                val msg = "ok"
-                Log.d("succes", msg)
-            }
-
-            override fun onFailure(call: Call<Unit>, t: Throwable) {
-                val msg = "error when subscribing: ${t.localizedMessage}"
-                Log.d("error", msg)
-                //onSubscriberCallback(msg)
-                onErrorCallback(msg)
-            }
-        })
+                override fun onFailure(call: Call<Unit>, t: Throwable) {
+                    val msg = "error when subscribing: ${t.localizedMessage}"
+                    Log.d("error", msg)
+                    //onSubscriberCallback(msg)
+                    onErrorCallback(msg)
+                }
+            })
     }
+
 
 
     // функция (getClientName) возвращает имя клиента Enkod
@@ -521,7 +469,7 @@ object EnkodPushLibrary {
         }
     }
 
-    fun getSessionFromLibrary(context: Context): String {
+    fun getSessionFromLibrary (context: Context): String {
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         val preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
         Log.d("prefstring", preferencesSessionId.toString())
@@ -537,6 +485,8 @@ object EnkodPushLibrary {
             preferencesToken!!
         } else ""
     }
+
+
 
 
     // функция (logOut) уничтожения текущей сессии
@@ -558,32 +508,23 @@ object EnkodPushLibrary {
         Log.i(TAG, msg)
     }
 
-
-    fun processMessage(context: Context, message: RemoteMessage, image: Bitmap?) {
-
-        createNotificationChannel(context)
-
-        createNotification(context, message, image)
-        Log.d("processMessage", message.data.toString())
-
+    fun processMessage(context: Context, message: RemoteMessage) {
+        CoroutineScope(Dispatchers.IO).launch {
+            createNotificationChannel(context)
+            createNotification(context, message)
+            Log.d("processMessage", message.data.toString())
+        }
 
     }
 
-
     // функции (createNotificationChannel) и (createNotification) создают и показывают push уведомления
 
-
-
-
-    fun createNotification(context: Context, message: RemoteMessage, image: Bitmap?) {
-
+      fun createNotification(context: Context, message: RemoteMessage) {
 
         with(message.data) {
 
             val data = message.data
-
-            Log.d("message", data.toString())
-
+            Log.d ("message", data.toString())
             var url = ""
 
             if (data.containsKey("url") && data[url] != null) {
@@ -593,7 +534,7 @@ object EnkodPushLibrary {
             val builder = NotificationCompat.Builder(context, CHANEL_Id)
 
 
-            val pendingIntent: PendingIntent = getIntent(
+            val pendingIntent: PendingIntent =  getIntent(
                 context, message.data, "", url
             )
 
@@ -603,9 +544,7 @@ object EnkodPushLibrary {
                 .setColor(context, data["color"])
                 .setLights(
                     get(ledColor), get(ledOnMs), get(
-                        ledOffMs
-                    )
-                )
+                        ledOffMs))
                 .setVibrate(get(vibrationOn).toBoolean())
                 .setSound(get(soundOn).toBoolean())
                 .setContentTitle(data["title"])
@@ -615,29 +554,25 @@ object EnkodPushLibrary {
                 .addActions(context, message.data)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
 
-            Log.d("Data_img", message.data["image"].toString())
 
+           if (message.data["image"] != null) {
+               if (getBitmapFromUrl(data["image"]) != null) {
+                   try {
+                       builder.setLargeIcon(getBitmapFromUrl(data["image"]))
+                           .setLargeIcon(getBitmapFromUrl(data["image"]))
+                           .setStyle(
+                               NotificationCompat.BigPictureStyle()
+                                   .bigPicture(getBitmapFromUrl(data["image"]))
+                                   .bigLargeIcon(getBitmapFromUrl(data["image"]))
 
-            if (image != null) {
+                           )
+                   } catch (e: Exception) {
+                       Log.d("error_in_set_img", e.toString())
+                   }
 
-                try {
+               }
 
-                    Log.d("Data_img", "in try")
-                    builder
-                        .setLargeIcon(image)
-                        .setStyle(
-                            NotificationCompat.BigPictureStyle()
-                                .bigPicture(image)
-                                .bigLargeIcon(image)
-
-                        )
-                } catch (e: Exception) {
-                    Log.d("error_in_set_img", e.toString())
-
-
-                }
-            }
-
+           }
 
             with(NotificationManagerCompat.from(context)) {
                 if (ActivityCompat.checkSelfPermission(
@@ -649,25 +584,13 @@ object EnkodPushLibrary {
                     return
                 }
 
-                notify(message.data["messageId"]!!.toInt(), builder.build())
-
-                exit = 1
-
-                Log.d("exit_exit_libraru", exit.toString())
-
+                  notify(message.data["messageId"]!!.toInt(), builder.build())
 
             }
         }
     }
 
-    fun exitSelf() {
-        exitSelf = 1
-    }
-
-
     fun createNotificationChannel(context: Context) {
-
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Notification Title"
             val descriptionText = "Notification Description"
@@ -687,7 +610,25 @@ object EnkodPushLibrary {
 
 // функция (processMessage) запускает процесс создания push уведомлений
 
-
+    internal fun getBitmapFromUrl(imageUrl: String?): Bitmap? {
+        Log.d("Library", "getBitmapFromUrl")
+        return try {
+            val url = URL(imageUrl)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.doInput = true
+            try {
+                connection.connect()
+            } catch (e: Exception) {
+                Log.e("awesome", "Error in getting connection: " + e.localizedMessage)
+            }
+            //connection.connect()
+            val input = connection.inputStream
+            BitmapFactory.decodeStream(input)
+        } catch (e: Exception) {
+            Log.e("awesome", "Error in getting notification image: " + e.localizedMessage)
+            null
+        }
+    }
 
     // функция (getIntent) определяет какой вид действия должен быть совершен после нажатия на push
 
@@ -698,7 +639,7 @@ object EnkodPushLibrary {
         url: String
     ): PendingIntent {
 
-        Log.d("message_info", "${data["intent"].toString()} ${field.toString()}")
+        Log.d ("message_info", "${data["intent"].toString()} ${field.toString()}")
         val intent =
             if (field == "1") {
                 getOpenUrlIntent(context, data, url)
@@ -744,11 +685,11 @@ object EnkodPushLibrary {
         val pm: PackageManager = context.packageManager
         return pm.getLaunchIntentForPackage(context.packageName).also {
             val bundle = (
-                    bundleOf(
-                        intentName to OpenIntent.OPEN_APP.get(),
-                        OpenIntent.OPEN_APP.name to true
-                    )
-                    )
+                bundleOf(
+                    intentName to OpenIntent.OPEN_APP.get(),
+                    OpenIntent.OPEN_APP.name to true
+                )
+            )
         }
     }
 
@@ -874,7 +815,7 @@ object EnkodPushLibrary {
     fun handleExtras(context: Context, extras: Bundle) {
         val link = extras.getString(url)
         Log.d("handleExtras", "handleExtras ${extras.getString("messageId")}")
-        sendPushClickInfo(extras, context)
+        sendPushClickInfo(extras)
         when (OpenIntent.get(extras.getString(intentName))) {
             OpenIntent.OPEN_URL -> {
                 context.startActivity(
@@ -901,24 +842,7 @@ object EnkodPushLibrary {
         }
     }
 
-    private fun sendPushClickInfo(extras: Bundle, context: Context) {
-
-        personId = "personId"
-        messageId = "messageId"
-        url = "url"
-
-        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-
-        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
-        var preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        var preferencesToken = preferences.getString(TOKEN_TAG, null)
-
-        this.sessionId = preferencesSessionId!!
-        this.token = preferencesToken!!
-        this.account = preferencesAcc!!
-
-        initRetrofit()
-
+    private fun sendPushClickInfo(extras: Bundle) {
         Log.d("sendPushClickInfo", "sendPushClickInfo")
         if (extras.getString(personId) != null && extras.getString(messageId) != null) {
             Log.d("sendPushClickInfo", "sendPushClickInfo_no_null")
@@ -951,7 +875,7 @@ object EnkodPushLibrary {
     }
 
     // функция (RemoveFromFavourite) фиксирует событые добавления в корзину
-    fun AddToCart(product: Product) {
+    fun AddToCart (product: Product) {
 
         if (!product.id.isNullOrEmpty()) {
 
@@ -971,8 +895,8 @@ object EnkodPushLibrary {
 
 
 
-            history.addProperty("action", "productAdd")
-            property = "cart"
+                    history.addProperty("action", "productAdd")
+                    property = "cart"
 
 
 
@@ -988,33 +912,33 @@ object EnkodPushLibrary {
             Log.d("req", req.toString())
 
 
-            retrofit.addToCart(
-                getClientName(),
-                sessionId!!,
-                req
-            ).enqueue(object : Callback<Unit> {
-                override fun onResponse(
-                    call: Call<Unit>,
-                    response: Response<Unit>
-                ) {
-                    val msg = "success"
-                    logInfo(msg)
-                    onProductActionCallback(msg)
+                retrofit.addToCart(
+                    getClientName(),
+                    sessionId!!,
+                    req
+                ).enqueue(object : Callback<Unit> {
+                    override fun onResponse(
+                        call: Call<Unit>,
+                        response: Response<Unit>
+                    ) {
+                        val msg = "success"
+                        logInfo(msg)
+                        onProductActionCallback(msg)
 
-                }
+                    }
 
-                override fun onFailure(call: Call<Unit>, t: Throwable) {
-                    val msg = "error when adding product to cart: ${t.localizedMessage}"
-                    logInfo(msg)
-                    onProductActionCallback(msg)
-                    onErrorCallback(msg)
-                }
-            })
+                    override fun onFailure(call: Call<Unit>, t: Throwable) {
+                        val msg = "error when adding product to cart: ${t.localizedMessage}"
+                        logInfo(msg)
+                        onProductActionCallback(msg)
+                        onErrorCallback(msg)
+                    }
+                })
         } else return
     }
 
     // функция (RemoveFromFavourite) фиксирует событые удаления из корзины
-    fun RemoveFromCart(product: Product) {
+        fun RemoveFromCart (product: Product) {
 
         if (!product.id.isNullOrEmpty()) {
 
@@ -1074,9 +998,8 @@ object EnkodPushLibrary {
             })
         } else return
     }
-
     // функция (RemoveFromFavourite) фиксирует событые добавления из избранное
-    fun AddToFavourite(product: Product) {
+    fun AddToFavourite (product: Product) {
 
         if (!product.id.isNullOrEmpty()) {
 
@@ -1095,8 +1018,8 @@ object EnkodPushLibrary {
             history.addProperty("picture", product.picture)
 
 
-            history.addProperty("action", "productLike")
-            property = "wishlist"
+                    history.addProperty("action", "productLike")
+                    property = "wishlist"
 
 
 
@@ -1112,37 +1035,35 @@ object EnkodPushLibrary {
             Log.d("req", req.toString())
 
 
-            retrofit.addToFavourite(
-                getClientName(),
-                sessionId!!,
-                req
-            ).enqueue(object : Callback<Unit> {
-                override fun onResponse(
-                    call: Call<Unit>,
-                    response: Response<Unit>
-                ) {
-                    Log.d("Favourite", "success")
-                    val msg = "success"
-                    logInfo(msg)
-                    onProductActionCallback(msg)
+                retrofit.addToFavourite(
+                    getClientName(),
+                    sessionId!!,
+                    req
+                ).enqueue(object : Callback<Unit> {
+                    override fun onResponse(
+                        call: Call<Unit>,
+                        response: Response<Unit>
+                    ) {
+                        val msg = "success"
+                        logInfo(msg)
+                        onProductActionCallback(msg)
 
-                }
+                    }
 
-                override fun onFailure(call: Call<Unit>, t: Throwable) {
-                    Log.d("Favourite", "${t.localizedMessage}")
-                    val msg = "error when adding product to cart: ${t.localizedMessage}"
-                    logInfo(msg)
-                    onProductActionCallback(msg)
-                    onErrorCallback(msg)
-                }
-            })
+                    override fun onFailure(call: Call<Unit>, t: Throwable) {
+                        val msg = "error when adding product to cart: ${t.localizedMessage}"
+                        logInfo(msg)
+                        onProductActionCallback(msg)
+                        onErrorCallback(msg)
+                    }
+                })
 
         } else return
     }
 
     // функция (RemoveFromFavourite) фиксирует событые удаления из избранного
 
-    fun RemoveFromFavourite(product: Product) {
+    fun RemoveFromFavourite (product: Product) {
 
         if (!product.id.isNullOrEmpty()) {
 

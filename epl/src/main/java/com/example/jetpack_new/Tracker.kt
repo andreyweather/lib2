@@ -14,11 +14,11 @@ data class SubscriberInfo(
 )
 
 data class Product(
-        var id: String,
-        var categoryId: String?,
-        var count: Int?,
-        var price: String?,
-        var picture: String?
+    var id: String,
+    var categoryId: String?,
+    var count: Int?,
+    var price: String?,
+    var picture: String?
 )
 
 data class Order(
