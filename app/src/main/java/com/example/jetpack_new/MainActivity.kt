@@ -1,7 +1,9 @@
 package com.example.jetpack_new
 
-import androidx.appcompat.app.AppCompatActivity
+import android.os.Build
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
+import com.enkod.enkodpushlibrary.EnkodPushLibrary
 import com.enkod.enkodpushlibrary.enkodConnect
 import com.example.jetpack_new.databinding.ActivityMainBinding
 
@@ -13,7 +15,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        enkodConnect("andrey_pogodin2", "newlibrarytest7@gmail.com", "89066495000").start(this)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            enkodConnect("andrey_pogodin3").start(this)
+        }
         binding.addCont.setOnClickListener {
             EnkodPushLibrary.addContact("newlibrarytest7@gmail.com")
             binding.contactIndecator.text = "contact on"

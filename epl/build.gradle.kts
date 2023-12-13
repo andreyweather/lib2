@@ -66,6 +66,7 @@ dependencies {
     annotationProcessor ("com.github.bumptech.glide:compiler:4.11.0")
 
 }
+
 publishing {
     publications {
         register<MavenPublication>("release") {
