@@ -61,4 +61,10 @@ dependencies {
     implementation ("com.github.bumptech.glide:annotations:4.16.0")
     implementation ("com.github.bumptech.glide:okhttp3-integration:4.11.0")
     annotationProcessor ("com.github.bumptech.glide:compiler:4.11.0")
+    implementation ("com.github.bumptech.glide:glide:4.16.0")
+    implementation ("com.github.bumptech.glide:annotations:4.16.0")
+    implementation ("com.github.bumptech.glide:okhttp3-integration:4.11.0")
+    annotationProcessor ("com.github.bumptech.glide:compiler:4.11.0")
+    api ("io.reactivex:rxandroid:1.2.1")
+    api ("io.reactivex:rxjava:1.1.6")
 }
