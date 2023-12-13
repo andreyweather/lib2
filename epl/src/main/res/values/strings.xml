@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="icon_res">icon</string>
+    <string name="color_name">color</string>
+    <string name="banner_name">banner</string>
+    <string name="notification_priority">priority</string>
+    <string name="led_color">led</string>
+    <string name="led_on_ms">led_on</string>
+    <string name="led_of_ms">led_off</string>
+    <string name="vibration_on">hasVibro</string>
+    <string name="sound_on">hasSound</string>
+    <string name="push_show_time">push_show_time</string>
+    <string name="intent_name">intent</string>
+    <string name="url">url</string>
+    <string name="channel_id">channel</string>
+    <string name="notification_image">image</string>
+    <string name="big_image_url">big_image_url</string>
+    <string name="title">title</string>
+    <string name="body">body</string>
+    <string name="notification_importance">notification_importance</string>
+    <string name="action_buttons_url">url_</string>
+    <string name="action_button_text">text_</string>
+    <string name="action_button_intent">intent_</string>
+    <string name="person_id">personId</string>
+    <string name="message_id">messageId</string>
+    <string name="account">clientName</string>
+</resources>

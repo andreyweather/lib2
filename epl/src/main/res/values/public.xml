@@ -1,0 +1,3 @@
+<resources>
+    <public name="person_id" type="string"/>
+</resources>
