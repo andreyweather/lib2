@@ -2,7 +2,6 @@ package com.example.jetpack_new
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import com.enkod.enkodpushlibrary.EnkodPushLibrary
 import com.enkod.enkodpushlibrary.enkodConnect
 import com.example.jetpack_new.databinding.ActivityMainBinding
 

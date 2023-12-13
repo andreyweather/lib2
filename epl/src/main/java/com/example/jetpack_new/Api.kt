@@ -44,32 +44,33 @@ interface Api {
         @Body pushClickBody: PushClickBody
     ): Call<UpdateTokenResponse>
 
-    @POST("subscribe/")
+    @POST("/subscribe")
     fun subscribe(@Header("X-Account")client:String,
                   @Header("X-Session-Id")session:String,
                   @Body subscribeBody:JsonObject)
     : Call<Unit>
 
 
-    @POST("/product/cart")
+    @POST("/mobile/product/cart")
     fun addToCart(@Header("X-Account")client:String,
                   @Header("X-Session-Id")session:String,
                   @Body body:JsonObject)
             : Call<Unit>
 
-    @POST("product/cart")
+    @POST("/mobile/product/cart")
     fun removeFromCart(@Header("X-Account")client:String,
                        @Header("X-Session-Id")session:String,
                        @Body body:JsonObject)
             : Call<Unit>
 
-    @POST("product/favourite")
+    @POST("/mobile/product/favourite")
     fun addToFavourite(@Header("X-Account")client:String,
                   @Header("X-Session-Id")session:String,
                   @Body body:JsonObject)
     : Call<Unit>
 
-    @POST("product/favourite")
+    @POST("/mobile/product/favourite")
+
     fun removeFromFavourite(@Header("X-Account")client:String,
                        @Header("X-Session-Id")session:String,
                        @Body body:JsonObject)
@@ -81,19 +82,19 @@ interface Api {
                             @Body body:JsonObject)
     : Call<Unit>
 
-    @POST("page/open")
+    @POST("/mobile/page/open")
     fun pageOpen(@Header("X-Account")client:String,
                        @Header("X-Session-Id")session:String,
                        @Body body:PageUrl)
     : Call<Unit>
 
-    @POST("product/open")
+    @POST("/mobile/product/open")
     fun productOpen(@Header("X-Account")client:String,
                  @Header("X-Session-Id")session:String,
                  @Body body:JsonObject)
             : Call<Unit>
 
-    @POST("product/order")
+    @POST("/mobile/product/order")
     fun order(@Header("X-Account")client:String,
                     @Header("X-Session-Id")session:String,
                     @Body body:JsonObject)
