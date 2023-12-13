@@ -65,6 +65,7 @@ dependencies {
     api ("io.reactivex:rxandroid:1.2.1")
     api ("io.reactivex:rxjava:1.1.6")
 }
+
 publishing {
     publications {
         register<MavenPublication>("release") {
