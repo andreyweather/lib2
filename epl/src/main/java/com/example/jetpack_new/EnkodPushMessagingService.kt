@@ -10,7 +10,6 @@ import com.enkod.enkodpushlibrary.EnkodPushLibrary.processMessage
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.sessionId
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.token
 import com.example.jetpack_new.R
-import com.example.jetpack_new_1.R
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
