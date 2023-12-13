@@ -19,6 +19,5 @@ class MainActivity : AppCompatActivity() {
             EnkodPushLibrary.addContact("newlibrarytest7@gmail.com")
             binding.contactIndecator.text = "contact on"
         }
-
     }
 }
