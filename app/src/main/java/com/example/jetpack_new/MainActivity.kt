@@ -18,8 +18,11 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             enkodConnect("andrey_pogodin3").start(this)
         }
+
+            //EnkodPushLibrary.addContact("newlibrarytest15@gmail.com")
+
         binding.addCont.setOnClickListener {
-            EnkodPushLibrary.addContact("newlibrarytest9@gmail.com")
+            EnkodPushLibrary.addContact("newlibrarytest17@gmail.com")
             binding.contactIndecator.text = "contact on"
         }
     }

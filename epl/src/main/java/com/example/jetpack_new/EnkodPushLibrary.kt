@@ -47,10 +47,10 @@ object EnkodPushLibrary {
 
     internal val CHANEL_Id = "enkod_lib_1"
     internal val notificationId = 1
-    var exit = 0
-    var exitSelf = 0
-    var isOnline = true
-
+    internal var exit = 0
+    internal var exitSelf = 0
+    internal var isOnline = true
+    internal var addContactAccess = false
 
 
     internal lateinit var soundOn: String
@@ -167,7 +167,6 @@ object EnkodPushLibrary {
 
         var preferencesSessionId: String? = ""
         var preferencesToken: String? = ""
-
 
 
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -290,6 +289,7 @@ object EnkodPushLibrary {
             override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
                 logInfo("get token from api failure ${t.message}")
                 Toast.makeText(ctx, "error: ${t.message}", Toast.LENGTH_LONG).show()
+
             }
         })
     }
@@ -355,32 +355,6 @@ object EnkodPushLibrary {
     }
 
 
-    fun updateTokenReload(ctx: Context, session: String?, token: String?) {
-
-        Log.d("updateToken", "updateToken")
-        retrofit.updateToken(
-            getClientName(),
-            getSession(),
-            SubscribeBody(
-                sessionId = session!!,
-                token = token!!
-            )
-        ).enqueue(object : Callback<UpdateTokenResponse> {
-            override fun onResponse(
-                call: Call<UpdateTokenResponse>,
-                response: Response<UpdateTokenResponse>
-            ) {
-                logInfo("token updated")
-                newTokenCallback(token!!)
-
-            }
-
-            override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
-                logInfo("token update failure")
-            }
-
-        })
-    }
 
 
     private fun startSession() {
@@ -437,7 +411,10 @@ object EnkodPushLibrary {
             ) {
                 logInfo("subscribed")
                 callback("subscribed")
+                addContactAccess = true
                 //addContact(email, phone)
+                Log.d("addContactAccess", addContactAccess.toString())
+
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
@@ -451,76 +428,102 @@ object EnkodPushLibrary {
 
     // функция (addContact) создания и добавления нового контакта на сервис
 
-    fun addContact(email: String = "", phone: String = "", extrafileds: Map<String, String>? = null) {
+    fun addContact(
 
-        if (isOnline) {
+        email: String = "",
+        phone: String = "",
+        extrafileds: Map<String, String>? = null
 
-            val req = JsonObject()
+    ) {
+
+        var access = false
+        var observation = true
+
+        CoroutineScope(Dispatchers.IO).launch {
+
+            while (observation) {
+
+                delay(100)
+
+                if (addContactAccess) {
+
+                    access = true
+                    observation = false
+
+                    if (access) {
+
+                        if (isOnline) {
+
+                            val req = JsonObject()
+
+                            if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
+                                req.add("mainChannel", Gson().toJsonTree("email"))
+                            } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
+                                req.add("mainChannel", Gson().toJsonTree("email"))
+                            } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
+                                req.add("mainChannel", Gson().toJsonTree("phone"))
+                            }
 
 
-            if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-                req.add("mainChannel", Gson().toJsonTree("email"))
-            } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
-                req.add("mainChannel", Gson().toJsonTree("email"))
-            } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-                req.add("mainChannel", Gson().toJsonTree("phone"))
-            }
+                            val fileds = JsonObject()
 
 
-            val fileds = JsonObject()
+                            if (!extrafileds.isNullOrEmpty()) {
+                                val keys = extrafileds.keys
 
+                                for (i in 0 until keys.size) {
 
-            if (!extrafileds.isNullOrEmpty()) {
-                val keys = extrafileds.keys
+                                    fileds.addProperty(
+                                        keys.elementAt(i),
+                                        extrafileds.getValue(keys.elementAt(i))
+                                    )
+                                }
+                            }
 
-                for (i in 0 until keys.size) {
+                            if (!email.isNullOrEmpty()) {
+                                fileds.addProperty("email", email)
+                            }
 
-                    fileds.addProperty(keys.elementAt(i), extrafileds.getValue(keys.elementAt(i)))
+                            if (!phone.isNullOrEmpty()) {
+                                fileds.addProperty("phone", phone)
+                            }
+
+                            req.add("fields", fileds)
+
+                            Log.d("req_json", req.toString())
+
+                                retrofit.subscribe(
+                                    getClientName(),
+                                    sessionId!!,
+                                    req
+
+                                ).enqueue(object : Callback<Unit> {
+                                    override fun onResponse(
+                                        call: Call<Unit>,
+                                        response: Response<Unit>
+                                    ) {
+                                        val msg = "ok"
+                                        Log.d("succes", msg)
+                                    }
+
+                                    override fun onFailure(call: Call<Unit>, t: Throwable) {
+                                        val msg = "error when subscribing: ${t.localizedMessage}"
+                                        Log.d("error", msg)
+                                        //onSubscriberCallback(msg)
+                                        onErrorCallback(msg)
+
+                                    }
+                                })
+                        } else {
+                            Log.d("Internet", "Интернет отсутствует")
+                        }
+                    }
                 }
             }
-
-            if (!email.isNullOrEmpty()) {
-                fileds.addProperty("email", email)
-            }
-
-            if (!phone.isNullOrEmpty()) {
-                fileds.addProperty("phone", phone)
-            }
-
-            req.add("fields", fileds)
-
-            Log.d("req_json", req.toString())
-
-            CoroutineScope(Dispatchers.IO).launch {
-
-                delay(1000)
-
-                retrofit.subscribe(
-                    getClientName(),
-                    sessionId!!,
-                    req
-
-                ).enqueue(object : Callback<Unit> {
-                    override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-                        val msg = "ok"
-                        Log.d("succes", msg)
-                    }
-
-                    override fun onFailure(call: Call<Unit>, t: Throwable) {
-                        val msg = "error when subscribing: ${t.localizedMessage}"
-                        Log.d("error", msg)
-                        //onSubscriberCallback(msg)
-                        onErrorCallback(msg)
-
-                    }
-                })
-            }
-        }else {
-            Log.d("Internet", "Интернет отсутствует")
         }
     }
 
-    fun isOnlineStatus (status: Int) {
+    fun isOnlineStatus(status: Int) {
         if (status == 1) isOnline = true
         else isOnline = false
     }
@@ -605,6 +608,8 @@ object EnkodPushLibrary {
     }
 
 
+    // функция (processMessage) запускает процесс создания push уведомлений
+
     fun processMessage(context: Context, message: RemoteMessage, image: Bitmap?) {
 
         createNotificationChannel(context)
@@ -617,8 +622,6 @@ object EnkodPushLibrary {
 
 
     // функции (createNotificationChannel) и (createNotification) создают и показывают push уведомления
-
-
 
 
     fun createNotification(context: Context, message: RemoteMessage, image: Bitmap?) {
@@ -731,7 +734,6 @@ object EnkodPushLibrary {
         }
     }
 
-// функция (processMessage) запускает процесс создания push уведомлений
 
 
 
