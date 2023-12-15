@@ -199,31 +199,39 @@ class enkodConnect(_account: String) : Activity() {
     @RequiresApi(Build.VERSION_CODES.O)
     fun start(context: Context) {
 
+        if (EnkodPushLibrary.isOnline(context)) {
 
-        Log.d("start", "ok")
+            Log.d("start", "ok")
+            EnkodPushLibrary.isOnlineStatus(1)
 
-        try {
+            try {
 
-            FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
-                if (!task.isSuccessful) {
-                    Log.w(
-                        ContentValues.TAG,
-                        "Fetching FCM registration token failed",
-                        task.exception
-                    )
-                    return@OnCompleteListener
-                }
+                FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
+                    if (!task.isSuccessful) {
+                        Log.w(
+                            ContentValues.TAG,
+                            "Fetching FCM registration token failed",
+                            task.exception
+                        )
+                        return@OnCompleteListener
+                    }
 
-                val token = task.result
-                EnkodPushLibrary.getToken(context, token)
+                    val token = task.result
+                    EnkodPushLibrary.getToken(context, token)
 
-            })
+                })
 
-            EnkodPushLibrary.init(context, account, 1)
+                EnkodPushLibrary.init(context, account, 1)
 
-        } catch (e: Exception) {
+            } catch (e: Exception) {
 
-            EnkodPushLibrary.init(context, account, 0)
+                EnkodPushLibrary.init(context, account, 0)
+
+            }
+        }else {
+
+            EnkodPushLibrary.isOnlineStatus(0)
+            Log.d("Internet", "Интернет отсутствует")
 
         }
     }

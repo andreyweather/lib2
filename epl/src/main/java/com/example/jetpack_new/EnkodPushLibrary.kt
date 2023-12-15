@@ -9,6 +9,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -22,6 +24,10 @@ import com.example.jetpack_new.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
@@ -43,6 +49,8 @@ object EnkodPushLibrary {
     internal val notificationId = 1
     var exit = 0
     var exitSelf = 0
+    var isOnline = true
+
 
 
     internal lateinit var soundOn: String
@@ -308,8 +316,8 @@ object EnkodPushLibrary {
         Log.d("new_token", newPreferencesToken.toString())
 
         if (newPreferencesToken.isNullOrEmpty()) {
+
             subscribeToPush {}
-            updateTokenReload(ctx, nsession, newPreferencesToken)
 
         } else updateToken(ctx, nsession, newPreferencesToken)
 
@@ -445,61 +453,98 @@ object EnkodPushLibrary {
 
     fun addContact(email: String = "", phone: String = "", extrafileds: Map<String, String>? = null) {
 
+        if (isOnline) {
 
-        val req = JsonObject()
-
-
-        if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-            req.add("mainChannel", Gson().toJsonTree("email"))
-        } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
-            req.add("mainChannel", Gson().toJsonTree("email"))
-        } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
-            req.add("mainChannel", Gson().toJsonTree("phone"))
-        }
+            val req = JsonObject()
 
 
-        val fileds = JsonObject()
-
-
-        if (!extrafileds.isNullOrEmpty()) {
-            val keys = extrafileds.keys
-
-            for (i in 0 until keys.size) {
-
-                fileds.addProperty(keys.elementAt(i), extrafileds.getValue(keys.elementAt(i)))
-            }
-        }
-
-        if (!email.isNullOrEmpty()) {
-            fileds.addProperty("email", email)
-        }
-
-        if (!phone.isNullOrEmpty()) {
-            fileds.addProperty("phone", phone)
-        }
-
-        req.add("fields", fileds)
-
-        Log.d("req_json", req.toString())
-
-        retrofit.subscribe(
-            getClientName(),
-            sessionId!!,
-            req
-
-        ).enqueue(object : Callback<Unit> {
-            override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
-                val msg = "ok"
-                Log.d("succes", msg)
+            if (!email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
+                req.add("mainChannel", Gson().toJsonTree("email"))
+            } else if (!email.isNullOrEmpty() && phone.isNullOrEmpty()) {
+                req.add("mainChannel", Gson().toJsonTree("email"))
+            } else if (email.isNullOrEmpty() && !phone.isNullOrEmpty()) {
+                req.add("mainChannel", Gson().toJsonTree("phone"))
             }
 
-            override fun onFailure(call: Call<Unit>, t: Throwable) {
-                val msg = "error when subscribing: ${t.localizedMessage}"
-                Log.d("error", msg)
-                //onSubscriberCallback(msg)
-                onErrorCallback(msg)
+
+            val fileds = JsonObject()
+
+
+            if (!extrafileds.isNullOrEmpty()) {
+                val keys = extrafileds.keys
+
+                for (i in 0 until keys.size) {
+
+                    fileds.addProperty(keys.elementAt(i), extrafileds.getValue(keys.elementAt(i)))
+                }
             }
-        })
+
+            if (!email.isNullOrEmpty()) {
+                fileds.addProperty("email", email)
+            }
+
+            if (!phone.isNullOrEmpty()) {
+                fileds.addProperty("phone", phone)
+            }
+
+            req.add("fields", fileds)
+
+            Log.d("req_json", req.toString())
+
+            CoroutineScope(Dispatchers.IO).launch {
+
+                delay(1000)
+
+                retrofit.subscribe(
+                    getClientName(),
+                    sessionId!!,
+                    req
+
+                ).enqueue(object : Callback<Unit> {
+                    override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
+                        val msg = "ok"
+                        Log.d("succes", msg)
+                    }
+
+                    override fun onFailure(call: Call<Unit>, t: Throwable) {
+                        val msg = "error when subscribing: ${t.localizedMessage}"
+                        Log.d("error", msg)
+                        //onSubscriberCallback(msg)
+                        onErrorCallback(msg)
+
+                    }
+                })
+            }
+        }else {
+            Log.d("Internet", "Интернет отсутствует")
+        }
+    }
+
+    fun isOnlineStatus (status: Int) {
+        if (status == 1) isOnline = true
+        else isOnline = false
+    }
+
+    fun isOnline(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (connectivityManager != null) {
+            val capabilities =
+                connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            if (capabilities != null) {
+                if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                    Log.i("Internet", "NetworkCapabilities.TRANSPORT_CELLULAR")
+                    return true
+                } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    Log.i("Internet", "NetworkCapabilities.TRANSPORT_WIFI")
+                    return true
+                } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                    Log.i("Internet", "NetworkCapabilities.TRANSPORT_ETHERNET")
+                    return true
+                }
+            }
+        }
+        return false
     }
 
 

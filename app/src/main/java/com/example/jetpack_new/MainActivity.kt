@@ -19,9 +19,8 @@ class MainActivity : AppCompatActivity() {
             enkodConnect("andrey_pogodin3").start(this)
         }
         binding.addCont.setOnClickListener {
-            EnkodPushLibrary.addContact("newlibrarytest7@gmail.com")
+            EnkodPushLibrary.addContact("newlibrarytest9@gmail.com")
             binding.contactIndecator.text = "contact on"
         }
-
     }
 }
