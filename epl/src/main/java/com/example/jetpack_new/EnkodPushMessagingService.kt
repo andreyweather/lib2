@@ -14,6 +14,7 @@ import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.initLateInit
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.initRetrofit
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.isOnlineStatus
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.processMessage
 import com.example.enkodpushlibrary.MyService
 import com.example.jetpack_new.R
@@ -47,6 +48,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
     override fun onDeletedMessages() {
 
+
         EnkodPushLibrary.onDeletedMessage()
 
     }
@@ -76,8 +78,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
         EnkodPushLibrary.ledOffMs = applicationContext.getString(R.string.led_of_ms)
         EnkodPushLibrary.colorName = applicationContext.getString(R.string.color_name)
         EnkodPushLibrary.iconRes = applicationContext.getString(R.string.icon_res)
-        EnkodPushLibrary.notificationPriority =
-            applicationContext.getString(R.string.notification_priority)
+        EnkodPushLibrary.notificationPriority = applicationContext.getString(R.string.notification_priority)
         EnkodPushLibrary.bannerName = applicationContext.getString(R.string.banner_name)
         EnkodPushLibrary.intentName = applicationContext.getString(R.string.intent_name)
         EnkodPushLibrary.channelId = applicationContext.getString(R.string.channel_id)
@@ -126,12 +127,15 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
 
     fun imageCheckAndStartLoad(message: RemoteMessage) {
+
         if (message.data["image"].isNullOrEmpty()) {
 
             processMessage(this, message, null)
 
         } else {
+
             downloadImageToPush(this, message)
+
         }
     }
 
@@ -148,6 +152,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                     userAgent
                 )
                 .build()
+
         )
 
         Observable.fromCallable(object : Callable<Bitmap?> {
@@ -185,10 +190,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
 class enkodConnect(_account: String) : Activity() {
 
-
-    private val TAG = "EnkodPushLibrary"
-
-
     val account: String
 
     init {
@@ -196,13 +197,12 @@ class enkodConnect(_account: String) : Activity() {
     }
 
 
-    @RequiresApi(Build.VERSION_CODES.O)
     fun start(context: Context) {
 
         if (EnkodPushLibrary.isOnline(context)) {
 
+            isOnlineStatus(1)
             Log.d("start", "ok")
-            EnkodPushLibrary.isOnlineStatus(1)
 
             try {
 
@@ -229,10 +229,8 @@ class enkodConnect(_account: String) : Activity() {
 
             }
         }else {
-
-            EnkodPushLibrary.isOnlineStatus(0)
+            isOnlineStatus(0)
             Log.d("Internet", "Интернет отсутствует")
-
         }
     }
 }

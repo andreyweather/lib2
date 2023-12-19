@@ -52,7 +52,6 @@ object EnkodPushLibrary {
     internal var isOnline = true
     internal var addContactAccess = false
 
-
     internal lateinit var soundOn: String
     internal lateinit var vibrationOn: String
     internal lateinit var pushShowTime: String
@@ -167,6 +166,7 @@ object EnkodPushLibrary {
 
         var preferencesSessionId: String? = ""
         var preferencesToken: String? = ""
+
 
 
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -289,7 +289,6 @@ object EnkodPushLibrary {
             override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
                 logInfo("get token from api failure ${t.message}")
                 Toast.makeText(ctx, "error: ${t.message}", Toast.LENGTH_LONG).show()
-
             }
         })
     }
@@ -354,9 +353,6 @@ object EnkodPushLibrary {
         })
     }
 
-
-
-
     private fun startSession() {
         var tokenSession = ""
         if (!this.token.isNullOrEmpty()) {
@@ -413,8 +409,6 @@ object EnkodPushLibrary {
                 callback("subscribed")
                 addContactAccess = true
                 //addContact(email, phone)
-                Log.d("addContactAccess", addContactAccess.toString())
-
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
@@ -432,6 +426,8 @@ object EnkodPushLibrary {
 
         email: String = "",
         phone: String = "",
+        source: String = "mobile",
+
         extrafileds: Map<String, String>? = null
 
     ) {
@@ -488,32 +484,36 @@ object EnkodPushLibrary {
                                 fileds.addProperty("phone", phone)
                             }
 
+
+                            req.addProperty("source", source)
+
+
                             req.add("fields", fileds)
 
                             Log.d("req_json", req.toString())
 
-                                retrofit.subscribe(
-                                    getClientName(),
-                                    sessionId!!,
-                                    req
+                            retrofit.subscribe(
+                                getClientName(),
+                                sessionId!!,
+                                req
 
-                                ).enqueue(object : Callback<Unit> {
-                                    override fun onResponse(
-                                        call: Call<Unit>,
-                                        response: Response<Unit>
-                                    ) {
-                                        val msg = "ok"
-                                        Log.d("succes", msg)
-                                    }
+                            ).enqueue(object : Callback<Unit> {
+                                override fun onResponse(
+                                    call: Call<Unit>,
+                                    response: Response<Unit>
+                                ) {
+                                    val msg = "ok"
+                                    Log.d("succes", msg)
+                                }
 
-                                    override fun onFailure(call: Call<Unit>, t: Throwable) {
-                                        val msg = "error when subscribing: ${t.localizedMessage}"
-                                        Log.d("error", msg)
-                                        //onSubscriberCallback(msg)
-                                        onErrorCallback(msg)
+                                override fun onFailure(call: Call<Unit>, t: Throwable) {
+                                    val msg = "error when subscribing: ${t.localizedMessage}"
+                                    Log.d("error", msg)
+                                    //onSubscriberCallback(msg)
+                                    onErrorCallback(msg)
 
-                                    }
-                                })
+                                }
+                            })
                         } else {
                             Log.d("Internet", "Интернет отсутствует")
                         }
@@ -523,11 +523,10 @@ object EnkodPushLibrary {
         }
     }
 
-    fun isOnlineStatus(status: Int) {
+    fun isOnlineStatus (status: Int) {
         if (status == 1) isOnline = true
         else isOnline = false
     }
-
     fun isOnline(context: Context): Boolean {
         val connectivityManager =
             context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -549,7 +548,6 @@ object EnkodPushLibrary {
         }
         return false
     }
-
 
     // функция (getClientName) возвращает имя клиента Enkod
 
@@ -608,8 +606,6 @@ object EnkodPushLibrary {
     }
 
 
-    // функция (processMessage) запускает процесс создания push уведомлений
-
     fun processMessage(context: Context, message: RemoteMessage, image: Bitmap?) {
 
         createNotificationChannel(context)
@@ -622,6 +618,8 @@ object EnkodPushLibrary {
 
 
     // функции (createNotificationChannel) и (createNotification) создают и показывают push уведомления
+
+
 
 
     fun createNotification(context: Context, message: RemoteMessage, image: Bitmap?) {
@@ -683,7 +681,6 @@ object EnkodPushLibrary {
                 } catch (e: Exception) {
                     Log.d("error_in_set_img", e.toString())
 
-
                 }
             }
 
@@ -702,7 +699,7 @@ object EnkodPushLibrary {
 
                 exit = 1
 
-                Log.d("exit_exit_libraru", exit.toString())
+                Log.d("exit_exit_library", exit.toString())
 
 
             }
@@ -734,6 +731,7 @@ object EnkodPushLibrary {
         }
     }
 
+// функция (processMessage) запускает процесс создания push уведомлений
 
 
 
@@ -997,6 +995,7 @@ object EnkodPushLibrary {
             })
         }
     }
+
 
     // функция (RemoveFromFavourite) фиксирует событые добавления в корзину
     fun AddToCart(product: Product) {
