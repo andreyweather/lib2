@@ -20,6 +20,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.bundleOf
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.model.GlideUrl
+import com.bumptech.glide.load.model.LazyHeaders
 import com.example.jetpack_new.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
@@ -33,8 +36,13 @@ import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
+import rx.Observable
+import rx.Observer
+import rx.android.schedulers.AndroidSchedulers
+import rx.schedulers.Schedulers
 import java.lang.reflect.Type
 import java.util.*
+import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 
 
@@ -46,9 +54,9 @@ object EnkodPushLibrary {
     private const val ACCOUNT_TAG: String = "${TAG}_ACCOUNT"
 
     internal val CHANEL_Id = "enkod_lib_1"
-    internal val notificationId = 1
     internal var exit = 0
     internal var exitSelf = 0
+    internal var serviceCreated = false
     internal var isOnline = true
     internal var addContactAccess = false
 
@@ -139,7 +147,8 @@ object EnkodPushLibrary {
         }
     }
 
-    fun initLateInit(context: Context) {
+    fun initPreferences(context: Context) {
+
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
         var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
@@ -156,9 +165,11 @@ object EnkodPushLibrary {
 
     @SuppressLint("SuspiciousIndentation")
     internal fun init(
+
         ctx: Context,
         account: String,
         firebaseIndicator: Int
+
     ) {
 
         initRetrofit()
@@ -166,7 +177,6 @@ object EnkodPushLibrary {
 
         var preferencesSessionId: String? = ""
         var preferencesToken: String? = ""
-
 
 
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -193,6 +203,7 @@ object EnkodPushLibrary {
     // функция (initRetrofit) инициализации библиотеки retrofit - выполняющую http запросы
 
     fun initRetrofit() {
+
         Log.d("Library", "initRetrofit")
         client = OkHttpClient.Builder()
             .callTimeout(60L, TimeUnit.SECONDS)
@@ -484,9 +495,7 @@ object EnkodPushLibrary {
                                 fileds.addProperty("phone", phone)
                             }
 
-
                             req.addProperty("source", source)
-
 
                             req.add("fields", fileds)
 
@@ -552,7 +561,7 @@ object EnkodPushLibrary {
     // функция (getClientName) возвращает имя клиента Enkod
 
     private fun getClientName(): String {
-        Log.d("Library", "getClientName ${this.account.toString()}")
+        Log.d("Library", "getClientName ${this.account}")
         return this.account
     }
 
@@ -563,9 +572,8 @@ object EnkodPushLibrary {
         return if (!this.sessionId.isNullOrEmpty()) {
             Log.d("getSession", " $sessionId")
             this.sessionId!!
-        } else {
-            ""
-        }
+        } else ""
+
     }
 
     fun getSessionFromLibrary(context: Context): String {
@@ -609,9 +617,7 @@ object EnkodPushLibrary {
     fun processMessage(context: Context, message: RemoteMessage, image: Bitmap?) {
 
         createNotificationChannel(context)
-
         createNotification(context, message, image)
-        Log.d("processMessage", message.data.toString())
 
 
     }
@@ -637,6 +643,11 @@ object EnkodPushLibrary {
                 url = data["url"].toString()
             }
 
+            for (key in keys) {
+                //message.data[key]
+                Log.d("message_tag", key.toString())
+            }
+
             val builder = NotificationCompat.Builder(context, CHANEL_Id)
 
 
@@ -649,9 +660,7 @@ object EnkodPushLibrary {
                 .setIcon(context, data["imageUrl"])
                 .setColor(context, data["color"])
                 .setLights(
-                    get(ledColor), get(ledOnMs), get(
-                        ledOffMs
-                    )
+                    get(ledColor), get(ledOnMs), get(ledOffMs)
                 )
                 .setVibrate(get(vibrationOn).toBoolean())
                 .setSound(get(soundOn).toBoolean())
@@ -662,14 +671,12 @@ object EnkodPushLibrary {
                 .addActions(context, message.data)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
 
-            Log.d("Data_img", message.data["image"].toString())
 
 
             if (image != null) {
 
                 try {
 
-                    Log.d("Data_img", "in try")
                     builder
                         .setLargeIcon(image)
                         .setStyle(
@@ -679,7 +686,7 @@ object EnkodPushLibrary {
 
                         )
                 } catch (e: Exception) {
-                    Log.d("error_in_set_img", e.toString())
+
 
                 }
             }
@@ -699,9 +706,6 @@ object EnkodPushLibrary {
 
                 exit = 1
 
-                Log.d("exit_exit_library", exit.toString())
-
-
             }
         }
     }
@@ -710,9 +714,32 @@ object EnkodPushLibrary {
         exitSelf = 1
     }
 
+    fun createdService () {
+
+        serviceCreated = true
+
+    }
+
+    fun createdServiceNotification (context: Context, message: RemoteMessage) {
+
+        var observer = true
+
+        CoroutineScope(Dispatchers.IO).launch {
+            while (observer) {
+
+                delay(100)
+
+                if (serviceCreated) {
+                    delay(3000)
+                    Log.d("service_state", "push")
+                    downloadImageToPush(context, message)
+                    observer = false
+                }
+            }
+        }
+    }
 
     fun createNotificationChannel(context: Context) {
-
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Notification Title"
@@ -731,9 +758,49 @@ object EnkodPushLibrary {
         }
     }
 
-// функция (processMessage) запускает процесс создания push уведомлений
+    fun downloadImageToPush(context: Context, message: RemoteMessage) {
 
+        val userAgent = System.getProperty("http.agent")
 
+        val url = GlideUrl(
+
+            message.data["image"], LazyHeaders.Builder()
+                .addHeader(
+                    "User-Agent",
+                    userAgent
+                )
+                .build()
+        )
+
+        Observable.fromCallable(object : Callable<Bitmap?> {
+            override fun call(): Bitmap? {
+                val future = Glide.with(context).asBitmap()
+                    .timeout(30000)
+                    .load(url).submit()
+                return future.get()
+            }
+        }).subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(object : Observer<Bitmap?> {
+
+                override fun onCompleted() {
+
+                }
+
+                override fun onError(e: Throwable) {
+
+                    Log.d("onError", e.message.toString())
+                    processMessage(context, message, null)
+
+                }
+
+                override fun onNext(t: Bitmap?) {
+                    processMessage(context, message, t!!)
+                    Log.d("onNext", t.toString())
+                    exitSelf()
+                }
+            })
+    }
 
     // функция (getIntent) определяет какой вид действия должен быть совершен после нажатия на push
 
@@ -965,17 +1032,24 @@ object EnkodPushLibrary {
 
         initRetrofit()
 
+        Log.d("extras", extras.getString(url).toString())
+        Log.d("extras", extras.getString(personId).toString())
+        Log.d("extras", extras.getString(messageId).toString())
+        Log.d("extras", extras.getString(intentName).toString())
+
         Log.d("sendPushClickInfo", "sendPushClickInfo")
         if (extras.getString(personId) != null && extras.getString(messageId) != null) {
             Log.d("sendPushClickInfo", "sendPushClickInfo_no_null")
             retrofit.pushClick(
                 getClientName(),
                 PushClickBody(
+
                     sessionId = sessionId!!,
                     personId = extras.getString(personId, "0").toInt(),
                     messageId = extras.getString(messageId, "-1").toInt(),
                     intent = extras.getString(intentName, "2").toInt(),
                     url = extras.getString(url)
+
                 )
             ).enqueue(object : Callback<UpdateTokenResponse> {
                 override fun onResponse(
@@ -991,6 +1065,7 @@ object EnkodPushLibrary {
                     val msg = "failure"
                     logInfo(msg)
                     onPushClickCallback(extras, msg)
+
                 }
             })
         }
@@ -1249,6 +1324,8 @@ object EnkodPushLibrary {
 
         } else return
     }
+
+
 
 
     // функция (productBuy) для передачи информации о покупках на сервис
