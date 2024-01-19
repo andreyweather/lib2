@@ -13,4 +13,5 @@ public final class BuildConfig {
   public static final String DEV_BASE_URL = "http://dev.ext.enkod.ru/";
   // Field from default config.
   public static final String PROD_BASE_URL = "http://ext.enkod.ru/";
+
 }

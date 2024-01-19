@@ -24,6 +24,7 @@ class OnOpenActivity : AppCompatActivity() {
             if (bundle != null) {
                 Log.i("handleExtras", "${intent.getStringExtra(EnkodPushLibrary.intentName)} $${intent.getStringExtra(EnkodPushLibrary.url)}")
                 EnkodPushLibrary.handleExtras(this@OnOpenActivity, bundle)
+
             }
         }
         finish()

@@ -17,7 +17,7 @@
 
         <service
             android:enabled="true"
-            android:name="com.example.enkodpushlibrary.MyService"
+            android:name="com.example.enkodpushlibrary.InternetService"
             android:exported="false"/>
 
         <activity

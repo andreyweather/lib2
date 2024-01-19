@@ -10,7 +10,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationCompat.Builder
 import com.enkod.enkodpushlibrary.EnkodPushLibrary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,20 +18,27 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
-class MyService(): Service() {
+
+class InternetService() : Service() {
+
 
     private val TAG = "EnkodPushLibrary"
-    private  val EXIT_TAG: String = "${TAG}_EXIT"
+    private val EXIT_TAG: String = "${TAG}_EXIT"
 
 
 
     override fun onCreate() {
 
+        Log.d("service_state", "start_onCreated")
+
         super.onCreate()
+
+        EnkodPushLibrary.createdService()
 
         Thread.setDefaultUncaughtExceptionHandler { paramThread, paramThrowable -> //Catch your exception
 
             System.exit(0)
+
         }
 
         try {
@@ -49,7 +56,7 @@ class MyService(): Service() {
                     channel
                 )
 
-                val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                val notification: Notification = Builder(this, CHANNEL_ID)
                     .setContentTitle("")
                     .setContentText("").build()
 
@@ -71,11 +78,30 @@ class MyService(): Service() {
                                 .putString(EXIT_TAG, "exit")
                                 .apply()
 
-                            Log.d ("service_state", "out_tag_exit")
+                            Log.d("service_state", "out_tag_exit")
 
                             delay(200)
                             exitProcess(0)
 
+                        }
+
+                        val preferences = applicationContext.getSharedPreferences(
+                            TAG,
+                            Context.MODE_PRIVATE
+                        )
+                        val exitPref = preferences.getString(EXIT_TAG, null)
+
+                        if (exitPref.toString() == "exit") {
+
+                            if (!isAppInforegrounded()) {
+
+                                exitProcess(0)
+                                stopSelf()
+
+                            } else {
+                                startForeground(1, notification)
+                                stopSelf()
+                            }
                         }
 
                     } else {
@@ -83,7 +109,7 @@ class MyService(): Service() {
                         startForeground(1, notification)
                         stopSelf()
 
-                        Log.d ("service_state", "foreground")
+                        Log.d("service_state", "foreground")
 
                     }
 
@@ -98,7 +124,7 @@ class MyService(): Service() {
 
                         startForeground(1, notification)
 
-                        Log.d ("service_state", "start_service")
+                        Log.d("service_state", "start_service_in")
 
                         var seflJob = true
                         while (seflJob) {
@@ -126,7 +152,7 @@ class MyService(): Service() {
                             stopSelf()
                             foregroundObserver = false
 
-                            delay (50)
+                            delay(50)
 
                         }
                     }
@@ -138,10 +164,11 @@ class MyService(): Service() {
 
                 }
             }
-        }catch (e: Exception) {
+        } catch (e: Exception) {
+
+            Log.d("service_exeption", e.toString())
 
         }
-
     }
 
     fun isAppInforegrounded(): Boolean {
@@ -162,11 +189,6 @@ class MyService(): Service() {
 
         return super.onStartCommand(intent, flags, startId)
 
+
     }
 }
-
-
-
-
-
-
