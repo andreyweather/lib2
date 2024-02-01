@@ -11,7 +11,6 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.defaultIconId
-import com.example.jetpack_new.R
 import java.util.*
 
 internal fun NotificationCompat.Builder.setIcon(context: Context, data: String?): NotificationCompat.Builder {
@@ -32,7 +31,7 @@ internal fun NotificationCompat.Builder.setIcon(context: Context, data: String?)
     }
     return this
 }
-
+/*
 internal fun NotificationCompat.Builder.setColor(context: Context, data: String?): NotificationCompat.Builder {
     fun defaultResID() = context.getResourceFromMeta("com.google.firebase.messaging.default_notification_color", R.color.white)
     if (data != null){
@@ -49,6 +48,8 @@ internal fun NotificationCompat.Builder.setColor(context: Context, data: String?
     }
     return this
 }
+
+ */
 
 private fun Context.getResourceFromMeta(path: String, default: Int): Int {
      return packageManager

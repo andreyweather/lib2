@@ -92,12 +92,12 @@ object EnkodPushLibrary {
     internal var sessionId: String? = null
     private var onPushClickCallback: (Bundle, String) -> Unit = { _, _ -> }
     private var onDynamicLinkClick: ((String) -> Unit)? = null
-    private var newTokenCallback: (String) -> Unit = {}
+    internal var newTokenCallback: (String) -> Unit = {}
     private var onDeletedMessage: () -> Unit = {}
     private var onProductActionCallback: (String) -> Unit = {}
     private var onErrorCallback: (String) -> Unit = {}
 
-    private lateinit var retrofit: Api
+    internal lateinit var retrofit: Api
     private lateinit var client: OkHttpClient
 
 
@@ -147,7 +147,7 @@ object EnkodPushLibrary {
         }
     }
 
-    fun initPreferences(context: Context) {
+  internal fun initPreferences(context: Context) {
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
@@ -202,7 +202,7 @@ object EnkodPushLibrary {
 
     // функция (initRetrofit) инициализации библиотеки retrofit - выполняющую http запросы
 
-    fun initRetrofit() {
+    internal fun initRetrofit() {
 
         Log.d("Library", "initRetrofit")
         client = OkHttpClient.Builder()
@@ -267,8 +267,6 @@ object EnkodPushLibrary {
         if (preferencesSessionId.isNullOrEmpty()) {
             getSessionIdFromApi(ctx)
         }
-
-
     }
 
     /* функция (getSessionIdFromApi) получения новой сессии (session_Id)
@@ -327,7 +325,7 @@ object EnkodPushLibrary {
 
         if (newPreferencesToken.isNullOrEmpty()) {
 
-            subscribeToPush {}
+            subscribeToPush (getClientName(), getSession(), token)
 
         } else updateToken(ctx, nsession, newPreferencesToken)
 
@@ -337,7 +335,7 @@ object EnkodPushLibrary {
      запускает функцию (subscribeToPush) которая подключает контакт к push уведомлениям.
     */
 
-    private fun updateToken(ctx: Context, session: String?, token: String?) {
+     private fun updateToken(ctx: Context, session: String?, token: String?) {
 
         Log.d("updateToken", "updateToken")
         retrofit.updateToken(
@@ -382,7 +380,7 @@ object EnkodPushLibrary {
                             logInfo("session started ${response.body()?.session_id}")
                             //isSessionStarted = true
                             newTokenCallback(it)
-                            subscribeToPush {}
+                            subscribeToPush (getClientName(), getSession(), token)
                         }
 
                         override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
@@ -397,17 +395,25 @@ object EnkodPushLibrary {
 
     //  функция (subscribeToPush) подключает контакт к push уведомлениям.
 
-    private fun subscribeToPush(callback: (String) -> Unit) {
+    private fun subscribeToPush(client: String?, session: String?, token: String?) {
+
+        var c = ""
+        var client: String? = if (client != null) client else c
+
+        var s = ""
+        var session: String? = if (session != null) session else s
 
         var t = ""
-        var token: String? = if (this.token != null) this.token else t
+        var token: String? = if (token != null) token else t
+
+
 
         Log.d("subscribeToPush", "subscribeToPush")
         retrofit.subscribeToPushToken(
-            getClientName(),
-            getSession(),
+            client!!,
+            session!!,
             SubscribeBody(
-                sessionId = sessionId!!,
+                sessionId = session!!,
                 token = token!!,
                 os = "android"
             )
@@ -417,14 +423,14 @@ object EnkodPushLibrary {
                 response: Response<UpdateTokenResponse>
             ) {
                 logInfo("subscribed")
-                callback("subscribed")
+                //callback("subscribed")
                 addContactAccess = true
                 //addContact(email, phone)
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
                 logInfo("MESSAGE ${t.localizedMessage}")
-                callback("failure")
+                //callback("failure")
             }
 
         })
@@ -658,7 +664,7 @@ object EnkodPushLibrary {
             builder
 
                 .setIcon(context, data["imageUrl"])
-                .setColor(context, data["color"])
+                //.setColor(context, data["color"])
                 .setLights(
                     get(ledColor), get(ledOnMs), get(ledOffMs)
                 )
@@ -711,7 +717,9 @@ object EnkodPushLibrary {
     }
 
     fun exitSelf() {
+
         exitSelf = 1
+
     }
 
     fun createdService () {
@@ -1038,7 +1046,9 @@ object EnkodPushLibrary {
         Log.d("extras", extras.getString(intentName).toString())
 
         Log.d("sendPushClickInfo", "sendPushClickInfo")
+
         if (extras.getString(personId) != null && extras.getString(messageId) != null) {
+
             Log.d("sendPushClickInfo", "sendPushClickInfo_no_null")
             retrofit.pushClick(
                 getClientName(),
@@ -1052,11 +1062,13 @@ object EnkodPushLibrary {
 
                 )
             ).enqueue(object : Callback<UpdateTokenResponse> {
+
                 override fun onResponse(
                     call: Call<UpdateTokenResponse>,
                     response: Response<UpdateTokenResponse>
                 ) {
                     val msg = "succsess"
+                    Log.d("sendPushClickInfo", "succsess")
                     logInfo(msg)
                     onPushClickCallback(extras, msg)
                 }
@@ -1437,6 +1449,7 @@ object EnkodPushLibrary {
         } else return
     }
 }
+
 
 
 

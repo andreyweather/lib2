@@ -35,7 +35,7 @@ class InternetService() : Service() {
 
         EnkodPushLibrary.createdService()
 
-        Thread.setDefaultUncaughtExceptionHandler { paramThread, paramThrowable -> //Catch your exception
+        Thread.setDefaultUncaughtExceptionHandler { paramThread, paramThrowable ->
 
             System.exit(0)
 
@@ -50,7 +50,7 @@ class InternetService() : Service() {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
                     "Channel",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_MIN
                 )
                 (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(
                     channel
@@ -59,6 +59,7 @@ class InternetService() : Service() {
                 val notification: Notification = Builder(this, CHANNEL_ID)
                     .setContentTitle("")
                     .setContentText("").build()
+
 
 
                 CoroutineScope(Dispatchers.IO).launch {
@@ -127,6 +128,7 @@ class InternetService() : Service() {
                         Log.d("service_state", "start_service_in")
 
                         var seflJob = true
+
                         while (seflJob) {
 
                             delay(100)
