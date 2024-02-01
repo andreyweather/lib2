@@ -294,6 +294,8 @@ class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() 
 
     fun start(context: Context) {
 
+        Log.d("start", "start")
+
         val preferences = context.getSharedPreferences(TAG, MODE_PRIVATE)
 
         fun refreshInMemoryWorker() {
@@ -369,13 +371,13 @@ class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() 
                     EnkodPushLibrary.getToken(context, token)
 
                 })
-
+                Log.d("start", "init_1")
                 EnkodPushLibrary.init(context, account, 1)
 
             } catch (e: Exception) {
 
                 EnkodPushLibrary.init(context, account, 0)
-
+                Log.d("start", "init_2")
             }
         } else {
             isOnlineStatus(0)

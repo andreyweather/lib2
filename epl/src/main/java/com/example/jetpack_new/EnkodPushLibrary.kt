@@ -191,6 +191,8 @@ object EnkodPushLibrary {
 
         if (firebaseIndicator == 0 && preferencesSessionId.isNullOrEmpty()) {
             getSessionIdFromApi(ctx)
+
+            Log.d("start", "firebaseIndicator0")
         }
 
         if (!this.sessionId.isNullOrEmpty()) {
@@ -274,6 +276,8 @@ object EnkodPushLibrary {
    */
 
     private fun getSessionIdFromApi(ctx: Context) {
+
+        Log.d("start", "getsession")
 
         Log.d("Library", "getSessionIdFromApi")
 
