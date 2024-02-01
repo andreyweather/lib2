@@ -16,7 +16,7 @@ class MainActivity : AppCompatActivity() {
 
 
             enkodConnect("andrey_pogodin3").start(this)
-            EnkodPushLibrary.addContact("aps_global3@gmail.com")
+            EnkodPushLibrary.addContact("aps_global5@gmail.com")
 
     }
 }

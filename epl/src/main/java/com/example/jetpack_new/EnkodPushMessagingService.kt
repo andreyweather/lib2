@@ -324,7 +324,7 @@ class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() 
 
             Log.d("doWork", "startOneTime")
             val workRequest = OneTimeWorkRequestBuilder<OneTimeWorkManager>()
-                .setInitialDelay(336, TimeUnit.HOURS)
+                //.setInitialDelay(336, TimeUnit.HOURS)
                 .build()
 
             WorkManager
@@ -462,7 +462,7 @@ class OneTimeWorkManager (context: Context, workerParameters: WorkerParameters) 
 
         val workRequest =
 
-            PeriodicWorkRequestBuilder<UpdateTokenWorker>(336, TimeUnit.HOURS)
+            PeriodicWorkRequestBuilder<UpdateTokenWorker>(15, TimeUnit.MINUTES)
                 .build()
 
         WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
