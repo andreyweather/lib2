@@ -172,6 +172,8 @@ object EnkodPushLibrary {
 
     ) {
 
+        Log.d("start", "init")
+
         initRetrofit()
         setClientName(ctx, account)
 
@@ -185,17 +187,17 @@ object EnkodPushLibrary {
         preferencesToken = preferences.getString(TOKEN_TAG, null)
 
 
-        this.sessionId = preferencesSessionId
-        this.token = preferencesToken
+        sessionId = preferencesSessionId
+        token = preferencesToken
 
 
-        if (firebaseIndicator == 0 && preferencesSessionId.isNullOrEmpty()) {
+        if (firebaseIndicator == 0 && sessionId.isNullOrEmpty()) {
             getSessionIdFromApi(ctx)
 
             Log.d("start", "firebaseIndicator0")
         }
 
-        if (!this.sessionId.isNullOrEmpty()) {
+        if (firebaseIndicator == 0 && !sessionId.isNullOrEmpty()) {
 
             startSession()
 
@@ -241,7 +243,7 @@ object EnkodPushLibrary {
 
     internal fun getToken(ctx: Context, token: String?) {
 
-        Log.d("Library", "getToken")
+        Log.d("start", "getToken")
 
         var preferencesSessionId: String? = ""
         var preferencesToken: String? = ""
@@ -264,11 +266,27 @@ object EnkodPushLibrary {
             this.token = token
 
             Log.d("new_token", this.token.toString())
+
+            if (!preferencesSessionId.isNullOrEmpty()) {
+
+                Log.d("start", "updateToken")
+
+                updateToken(ctx, preferencesSessionId, token)
+            }
+        }
+
+        if (this.token == token && !preferencesSessionId.isNullOrEmpty()) {
+
+            Log.d("start", "startSession+token")
+            startSession()
         }
 
         if (preferencesSessionId.isNullOrEmpty()) {
+
+            Log.d("start", "getSessionIdFromApi+token")
             getSessionIdFromApi(ctx)
         }
+
     }
 
     /* функция (getSessionIdFromApi) получения новой сессии (session_Id)
