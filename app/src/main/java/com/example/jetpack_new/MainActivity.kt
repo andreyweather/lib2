@@ -1,6 +1,7 @@
 package com.example.jetpack_new
 
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.enkod.enkodpushlibrary.EnkodPushLibrary
 import com.enkod.enkodpushlibrary.enkodConnect
@@ -16,7 +17,9 @@ class MainActivity : AppCompatActivity() {
 
 
             enkodConnect("andrey_pogodin3").start(this)
-            EnkodPushLibrary.addContact("aps_global21225@gmail.com")
+            EnkodPushLibrary.addContact("fcm_tokekup5@gmail.com")
+
+        Log.d("new", "activity")
 
     }
 }

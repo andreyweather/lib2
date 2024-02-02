@@ -32,7 +32,6 @@ import com.enkod.enkodpushlibrary.EnkodPushLibrary.initRetrofit
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.isOnlineStatus
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.processMessage
 import com.example.enkodpushlibrary.InternetService
-import com.example.jetpack_new.R
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -76,10 +75,13 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
 
-
+        super.onMessageReceived(message)
         Log.d("onMessageReceived", message.toString())
 
-        super.onMessageReceived(message)
+
+        val variable = Variables()
+        variable.initVariables(applicationContext)
+
 
         // EXIT_TAG - preferences с содержанием поля "noexit" открывают доступ к методу startForeground() в InternetService
 
@@ -88,31 +90,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
             .putString(EXIT_TAG, "noexit")
             .apply()
-
-
-        EnkodPushLibrary.soundOn = applicationContext.getString(R.string.sound_on)
-        EnkodPushLibrary.vibrationOn = applicationContext.getString(R.string.vibration_on)
-        EnkodPushLibrary.pushShowTime = applicationContext.getString(R.string.push_show_time)
-        EnkodPushLibrary.ledColor = applicationContext.getString(R.string.led_color)
-        EnkodPushLibrary.ledOnMs = applicationContext.getString(R.string.led_on_ms)
-        EnkodPushLibrary.ledOffMs = applicationContext.getString(R.string.led_of_ms)
-        EnkodPushLibrary.colorName = applicationContext.getString(R.string.color_name)
-        EnkodPushLibrary.iconRes = applicationContext.getString(R.string.icon_res)
-        EnkodPushLibrary.notificationPriority = applicationContext.getString(R.string.notification_priority)
-        EnkodPushLibrary.bannerName = applicationContext.getString(R.string.banner_name)
-        EnkodPushLibrary.intentName = applicationContext.getString(R.string.intent_name)
-        EnkodPushLibrary.channelId = applicationContext.getString(R.string.channel_id)
-        EnkodPushLibrary.notificationImage = applicationContext.getString(R.string.notification_image)
-        EnkodPushLibrary.bigImageUrl = applicationContext.getString(R.string.big_image_url)
-        EnkodPushLibrary.title = applicationContext.getString(R.string.title)
-        EnkodPushLibrary.body = applicationContext.getString(R.string.body)
-        EnkodPushLibrary.url = applicationContext.getString(R.string.url)
-        EnkodPushLibrary.notificationImportance = applicationContext.getString(R.string.notification_importance)
-        EnkodPushLibrary.actionButtonsUrl = applicationContext.getString(R.string.action_buttons_url)
-        EnkodPushLibrary.actionButtonText = applicationContext.getString(R.string.action_button_text)
-        EnkodPushLibrary.actionButtonIntent = applicationContext.getString(R.string.action_button_intent)
-        EnkodPushLibrary.personId = applicationContext.getString(R.string.person_id)
-        EnkodPushLibrary.messageId = applicationContext.getString(R.string.message_id)
 
 
         if (!message.data["image"].isNullOrEmpty()) {
@@ -182,16 +159,15 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                 .setIcon(applicationContext, data["imageUrl"])
                                 //.setColor(applicationContext, data["color"])
                                 .setLights(
-                                    get(EnkodPushLibrary.ledColor),
-                                    get(EnkodPushLibrary.ledOnMs),
-                                    get(
-                                        EnkodPushLibrary.ledOffMs
+                                    get(variable.ledColor),
+                                    get(variable.ledOnMs),
+                                    get(variable.ledOffMs
                                     )
                                 )
-                                .setVibrate(get(EnkodPushLibrary.vibrationOn).toBoolean())
-                                .setSound(get(EnkodPushLibrary.soundOn).toBoolean())
-                                .setContentTitle(data["title"])
-                                .setContentText(data["body"])
+                                .setVibrate(get(variable.vibrationOn).toBoolean())
+                                .setSound(get(variable.soundOn).toBoolean())
+                                .setContentTitle(data[variable.title])
+                                .setContentText(data[variable.body])
                                 .setContentIntent(pendingIntent)
                                 .setAutoCancel(true)
                                 .addActions(applicationContext, message.data)
@@ -216,7 +192,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                 }
                             }
 
-
                             with(NotificationManagerCompat.from(applicationContext)) {
                                 if (ActivityCompat.checkSelfPermission(
                                         applicationContext,
@@ -227,7 +202,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                     return
                                 }
 
-                                notify(message.data["messageId"]!!.toInt(), builder.build())
+                                notify(message.data[variable.messageId]!!.toInt(), builder.build())
 
                             }
                         }
@@ -236,6 +211,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
                     }
                 })
+
         } else {
             processMessage(this, message, null)
         }
@@ -243,7 +219,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
         initRetrofit()
         initPreferences(this)
-
 
     }
 
@@ -288,7 +263,6 @@ class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() 
         account = _account
         tokenUpdate = _tokenUpdate
     }
-
 
 
 
@@ -350,12 +324,13 @@ class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() 
 
         }
 
-
         if (EnkodPushLibrary.isOnline(context)) {
 
             isOnlineStatus(1)
 
             try {
+
+                Log.d("new_token", "token")
 
                 FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
                     if (!task.isSuccessful) {
@@ -368,17 +343,17 @@ class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() 
                     }
 
                     val token = task.result
-                    EnkodPushLibrary.getToken(context, token)
+
+                    EnkodPushLibrary.init(context,account,token)
 
                 })
-                Log.d("start", "init_1")
-                EnkodPushLibrary.init(context, account, 1)
 
             } catch (e: Exception) {
 
-                EnkodPushLibrary.init(context, account, 0)
-                Log.d("start", "init_2")
+                EnkodPushLibrary.init(context, account)
+
             }
+
         } else {
             isOnlineStatus(0)
             Log.d("Internet", "Интернет отсутствует")
@@ -417,6 +392,7 @@ class UpdateTokenWorker(context: Context, workerParams: WorkerParameters) :
         if (preferencesAcc != null) {
 
             try {
+                Log.d("doWork", "inBlock")
 
                 initRetrofit()
 
@@ -439,9 +415,7 @@ class UpdateTokenWorker(context: Context, workerParams: WorkerParameters) :
 
                     Log.d("doWork", token.toString())
 
-                    EnkodPushLibrary.getToken(applicationContext, token)
-                    EnkodPushLibrary.init(applicationContext, preferencesAcc, 1)
-
+                    EnkodPushLibrary.init(applicationContext, preferencesAcc, token)
 
                 })
 

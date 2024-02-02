@@ -1,7 +1,6 @@
 package com.enkod.enkodpushlibrary
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -26,7 +25,9 @@ import com.bumptech.glide.load.model.LazyHeaders
 import com.example.jetpack_new.R
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
-import com.google.gson.*
+import com.google.gson.Gson
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -34,17 +35,21 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Converter
+import retrofit2.Response
+import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import rx.Observable
 import rx.Observer
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import java.lang.reflect.Type
-import java.util.*
+import java.util.Random
+import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
-
 
 object EnkodPushLibrary {
 
@@ -60,36 +65,17 @@ object EnkodPushLibrary {
     internal var isOnline = true
     internal var addContactAccess = false
 
-    internal lateinit var soundOn: String
-    internal lateinit var vibrationOn: String
-    internal lateinit var pushShowTime: String
-    internal lateinit var ledColor: String
-    internal lateinit var ledOnMs: String
-    internal lateinit var ledOffMs: String
-    internal lateinit var colorName: String
-    internal lateinit var iconRes: String
-    internal lateinit var notificationPriority: String
-    internal lateinit var bannerName: String
-    internal lateinit var channelId: String
-    internal lateinit var notificationImage: String
-    internal lateinit var bigImageUrl: String
-    internal var url: String = "url"
-    internal lateinit var title: String
-    internal lateinit var body: String
-    internal lateinit var notificationImportance: String
-    internal lateinit var actionButtonsUrl: String
-    internal lateinit var actionButtonText: String
-    internal lateinit var actionButtonIntent: String
-    internal lateinit var personId: String
-    internal lateinit var messageId: String
-    internal lateinit var account: String
 
+    internal var account: String? = null
+    internal var token: String? = null
+    internal var sessionId: String? = null
+
+    internal var intentName = "intent"
+    internal var url: String = "url"
 
     internal val vibrationPattern = longArrayOf(1500, 500)
     internal val defaultIconId: Int = R.drawable.ic_android_black_24dp
-    internal var intentName = "intent"
-    internal var token: String? = null
-    internal var sessionId: String? = null
+
     private var onPushClickCallback: (Bundle, String) -> Unit = { _, _ -> }
     private var onDynamicLinkClick: ((String) -> Unit)? = null
     internal var newTokenCallback: (String) -> Unit = {}
@@ -156,52 +142,10 @@ object EnkodPushLibrary {
         var preferencesToken = preferences.getString(TOKEN_TAG, null)
 
 
-        this.sessionId = preferencesSessionId!!
-        this.token = preferencesToken!!
-        this.account = preferencesAcc!!
-    }
+        this.sessionId = preferencesSessionId
+        this.token = preferencesToken
+        this.account = preferencesAcc
 
-    // данная функция (init) производит инициализацию библиотеки - запускает необходимые функции
-
-    @SuppressLint("SuspiciousIndentation")
-    internal fun init(
-
-        ctx: Context,
-        account: String,
-        firebaseIndicator: Int
-
-    ) {
-
-        Log.d("start", "init")
-
-        initRetrofit()
-        setClientName(ctx, account)
-
-        var preferencesSessionId: String? = ""
-        var preferencesToken: String? = ""
-
-
-        val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-
-        preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        preferencesToken = preferences.getString(TOKEN_TAG, null)
-
-
-        sessionId = preferencesSessionId
-        token = preferencesToken
-
-
-        if (firebaseIndicator == 0 && sessionId.isNullOrEmpty()) {
-            getSessionIdFromApi(ctx)
-
-            Log.d("start", "firebaseIndicator0")
-        }
-
-        if (firebaseIndicator == 0 && !sessionId.isNullOrEmpty()) {
-
-            startSession()
-
-        }
     }
 
     // функция (initRetrofit) инициализации библиотеки retrofit - выполняющую http запросы
@@ -241,52 +185,60 @@ object EnkodPushLibrary {
        Если значение = null запускается функция получение новой сессии
     */
 
-    internal fun getToken(ctx: Context, token: String?) {
+    internal fun init (context: Context, account: String, token: String? = null) {
 
-        Log.d("start", "getToken")
+        initRetrofit()
+        setClientName(context, account)
+        initPreferences(context)
 
-        var preferencesSessionId: String? = ""
-        var preferencesToken: String? = ""
+        when (token) {
 
-        val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+            null -> {
 
-        preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        preferencesToken = preferences.getString(TOKEN_TAG, null)
+                if (sessionId.isNullOrEmpty()) getSessionIdFromApi(context)
+                if (!sessionId.isNullOrEmpty()) startSession()
 
-        this.sessionId = preferencesSessionId
-        this.token = preferencesToken
+                Log.d("lib_lvl", "no_fb")
+
+            }
+
+            else -> {
 
 
-        if (this.token != token) {
+                if (this.token == token && !sessionId.isNullOrEmpty()) {
 
-            val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-            preferences.edit()
-                .putString(TOKEN_TAG, token)
-                .apply()
-            this.token = token
+                    Log.d("lib_lvl", "start_session_fb_true")
+                    startSession()
+                }
 
-            Log.d("new_token", this.token.toString())
+                if (this.token != token) {
 
-            if (!preferencesSessionId.isNullOrEmpty()) {
+                    val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+                    preferences.edit()
+                        .putString(TOKEN_TAG, token)
+                        .apply()
+                    this.token = token
 
-                Log.d("start", "updateToken")
+                    Log.d("lib_lvl", this.token.toString())
 
-                updateToken(ctx, preferencesSessionId, token)
+
+                    if (!sessionId.isNullOrEmpty()) {
+
+                        Log.d("lib_lvl", "update_fb_true")
+
+                        updateToken(sessionId, token)
+
+                    }
+                }
+
+                if (sessionId.isNullOrEmpty()) {
+
+                    Log.d("lib_lvl", "created_session_fb_true")
+                    getSessionIdFromApi(context)
+
+                }
             }
         }
-
-        if (this.token == token && !preferencesSessionId.isNullOrEmpty()) {
-
-            Log.d("start", "startSession+token")
-            startSession()
-        }
-
-        if (preferencesSessionId.isNullOrEmpty()) {
-
-            Log.d("start", "getSessionIdFromApi+token")
-            getSessionIdFromApi(ctx)
-        }
-
     }
 
     /* функция (getSessionIdFromApi) получения новой сессии (session_Id)
@@ -295,9 +247,7 @@ object EnkodPushLibrary {
 
     private fun getSessionIdFromApi(ctx: Context) {
 
-        Log.d("start", "getsession")
-
-        Log.d("Library", "getSessionIdFromApi")
+        Log.d("lib_lvl", "getSessionIdFromApi")
 
         retrofit.getSessionId(getClientName()).enqueue(object : Callback<SessionIdResponse> {
             override fun onResponse(
@@ -305,20 +255,19 @@ object EnkodPushLibrary {
                 response: Response<SessionIdResponse>
             ) {
                 response.body()?.session_id?.let {
-                    logInfo("get token from api $it\n")
+
                     Log.d("new_session", it)
                     newSessions(ctx, it)
                     Toast.makeText(ctx, "connect_getSessionIdFromApi", Toast.LENGTH_LONG).show()
 
                 } ?: run {
-                    logInfo("get token from api error")
+
                     Toast.makeText(ctx, "error_getSessionIdFromApi", Toast.LENGTH_LONG).show()
                 }
-
             }
 
             override fun onFailure(call: Call<SessionIdResponse>, t: Throwable) {
-                logInfo("get token from api failure ${t.message}")
+
                 Toast.makeText(ctx, "error: ${t.message}", Toast.LENGTH_LONG).show()
             }
         })
@@ -330,7 +279,7 @@ object EnkodPushLibrary {
 
     private fun newSessions(ctx: Context, nsession: String?) {
 
-        Log.d("Library", "newSessions")
+        Log.d("lib_lvl", "newSessions")
 
 
         val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -349,7 +298,7 @@ object EnkodPushLibrary {
 
             subscribeToPush (getClientName(), getSession(), token)
 
-        } else updateToken(ctx, nsession, newPreferencesToken)
+        } else updateToken(nsession, newPreferencesToken)
 
     }
 
@@ -357,9 +306,9 @@ object EnkodPushLibrary {
      запускает функцию (subscribeToPush) которая подключает контакт к push уведомлениям.
     */
 
-     private fun updateToken(ctx: Context, session: String?, token: String?) {
+     private fun updateToken(session: String?, token: String?) {
 
-        Log.d("updateToken", "updateToken")
+        Log.d("lib_lvl", "updateToken")
         retrofit.updateToken(
             getClientName(),
             getSession(),
@@ -389,7 +338,7 @@ object EnkodPushLibrary {
         if (!this.token.isNullOrEmpty()) {
             tokenSession = this.token!!
         }
-        Log.d("start_session", "yes ${this.token}")
+        Log.d("lib_lvl", "startSession")
         tokenSession?.let {
             logInfo("on start session \n")
             sessionId?.let { it1 ->
@@ -429,8 +378,8 @@ object EnkodPushLibrary {
         var token: String? = if (token != null) token else t
 
 
+        Log.d("lib_lvl", "subscribeToPush")
 
-        Log.d("subscribeToPush", "subscribeToPush")
         retrofit.subscribeToPushToken(
             client!!,
             session!!,
@@ -590,7 +539,7 @@ object EnkodPushLibrary {
 
     private fun getClientName(): String {
         Log.d("Library", "getClientName ${this.account}")
-        return this.account
+        return this.account!!
     }
 
     // функция (getSession) private возвращает значение сессии
@@ -688,10 +637,10 @@ object EnkodPushLibrary {
                 .setIcon(context, data["imageUrl"])
                 //.setColor(context, data["color"])
                 .setLights(
-                    get(ledColor), get(ledOnMs), get(ledOffMs)
+                    get(variables.ledColor), get(variables.ledOnMs), get(variables.ledOffMs)
                 )
-                .setVibrate(get(vibrationOn).toBoolean())
-                .setSound(get(soundOn).toBoolean())
+                .setVibrate(get(variables.vibrationOn).toBoolean())
+                .setSound(get(variables.soundOn).toBoolean())
                 .setContentTitle(data["title"])
                 .setContentText(data["body"])
                 .setContentIntent(pendingIntent)
@@ -857,8 +806,7 @@ object EnkodPushLibrary {
             }
 
         intent!!.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra(personId, data[personId])
-        intent.putExtra(messageId, data[messageId])
+        intent.putExtra(variables.personId, data[variables.personId])
 
         return PendingIntent.getActivity(
             context,
@@ -1046,8 +994,8 @@ object EnkodPushLibrary {
 
     private fun sendPushClickInfo(extras: Bundle, context: Context) {
 
-        personId = "personId"
-        messageId = "messageId"
+        variables.personId = "personId"
+        variables.messageId = "messageId"
         url = "url"
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -1063,13 +1011,13 @@ object EnkodPushLibrary {
         initRetrofit()
 
         Log.d("extras", extras.getString(url).toString())
-        Log.d("extras", extras.getString(personId).toString())
-        Log.d("extras", extras.getString(messageId).toString())
+        Log.d("extras", extras.getString(variables.personId).toString())
+        Log.d("extras", extras.getString(variables.messageId).toString())
         Log.d("extras", extras.getString(intentName).toString())
 
         Log.d("sendPushClickInfo", "sendPushClickInfo")
 
-        if (extras.getString(personId) != null && extras.getString(messageId) != null) {
+        if (extras.getString(variables.personId) != null && extras.getString(variables.messageId) != null) {
 
             Log.d("sendPushClickInfo", "sendPushClickInfo_no_null")
             retrofit.pushClick(
@@ -1077,8 +1025,8 @@ object EnkodPushLibrary {
                 PushClickBody(
 
                     sessionId = sessionId!!,
-                    personId = extras.getString(personId, "0").toInt(),
-                    messageId = extras.getString(messageId, "-1").toInt(),
+                    personId = extras.getString(variables.personId, "0").toInt(),
+                    messageId = extras.getString(variables.messageId, "-1").toInt(),
                     intent = extras.getString(intentName, "2").toInt(),
                     url = extras.getString(url)
 
