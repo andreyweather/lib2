@@ -1,11 +1,7 @@
 package com.enkod.enkodpushlibrary
 
 import android.Manifest
-import android.app.Activity
-import android.app.ActivityManager
 import android.app.PendingIntent
-import android.content.ContentValues
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -15,13 +11,6 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.work.CoroutineWorker
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.Worker
-import androidx.work.WorkerParameters
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
@@ -29,26 +18,21 @@ import com.enkod.enkodpushlibrary.EnkodPushLibrary.createdServiceNotification
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.downloadImageToPush
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.initPreferences
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.initRetrofit
-import com.enkod.enkodpushlibrary.EnkodPushLibrary.isOnlineStatus
+import com.enkod.enkodpushlibrary.EnkodPushLibrary.isAppInforegrounded
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.processMessage
-import com.example.enkodpushlibrary.InternetService
-import com.google.android.gms.tasks.OnCompleteListener
-import com.google.firebase.messaging.FirebaseMessaging
+import com.example.jetpack_new.NetworkService
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import kotlinx.coroutines.delay
 import rx.Observable
 import rx.Observer
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import java.util.concurrent.Callable
-import java.util.concurrent.TimeUnit
 
 
 private val TAG = "EnkodPushLibrary"
-private val EXIT_TAG: String = "${TAG}_EXIT"
-private val WORKER_TAG: String = "${TAG}_WORKER"
-private val ACCOUNT_TAG = "${TAG}_ACCOUNT"
+private val MESSAGEID_TAG = "${TAG}_MESSAGEID"
+
 
 class EnkodPushMessagingService : FirebaseMessagingService() {
 
@@ -66,7 +50,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
     override fun onDeletedMessages() {
 
-
         EnkodPushLibrary.onDeletedMessage()
 
     }
@@ -80,145 +63,151 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
 
         val variable = Variables()
-        variable.initVariables(applicationContext)
+
+                val preferences = applicationContext.getSharedPreferences(TAG, MODE_PRIVATE)
+
+                preferences.edit()
+                    .remove(MESSAGEID_TAG).apply()
 
 
-        // EXIT_TAG - preferences с содержанием поля "noexit" открывают доступ к методу startForeground() в InternetService
+                preferences.edit()
+                    .putString(MESSAGEID_TAG, "${message.data["messageId"]}")
+                    .apply()
 
-        val preferences = applicationContext.getSharedPreferences(TAG, MODE_PRIVATE)
-        preferences.edit()
+                if (!message.data["image"].isNullOrEmpty()) {
 
-            .putString(EXIT_TAG, "noexit")
-            .apply()
+                    val userAgent = System.getProperty("http.agent")
 
+                    val url = GlideUrl(
 
-        if (!message.data["image"].isNullOrEmpty()) {
-
-            val userAgent = System.getProperty("http.agent")
-
-            val url = GlideUrl(
-
-                message.data["image"], LazyHeaders.Builder()
-                    .addHeader(
-                        "User-Agent",
-                        userAgent
+                        message.data["image"], LazyHeaders.Builder()
+                            .addHeader(
+                                "User-Agent",
+                                userAgent
+                            )
+                            .build()
                     )
-                    .build()
-            )
 
-            Observable.fromCallable(object : Callable<Bitmap?> {
-                override fun call(): Bitmap? {
-                    val future = Glide.with(applicationContext).asBitmap()
-                        .timeout(30000)
-                        .load(url).submit()
-                    return future.get()
-                }
-            }).subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(object : Observer<Bitmap?> {
+                    Observable.fromCallable(object : Callable<Bitmap?> {
+                        override fun call(): Bitmap? {
+                            val future = Glide.with(applicationContext).asBitmap()
+                                .timeout(30000)
+                                .load(url).submit()
+                            return future.get()
+                        }
+                    }).subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(object : Observer<Bitmap?> {
 
-                    override fun onCompleted() {
+                            override fun onCompleted() {
 
-                    }
-
-                    override fun onError(e: Throwable) {
-
-                        Log.d("onError_one", e.message.toString())
-
-                        startService(message)
-
-                    }
-
-                    override fun onNext(bitmap: Bitmap?) {
-
-                        EnkodPushLibrary.createNotificationChannel(applicationContext)
-
-                        with(message.data) {
-
-                            val data = message.data
-
-                            Log.d("message", data.toString())
-
-                            var url = ""
-
-                            if (data.containsKey("url") && data[url] != null) {
-                                url = data["url"].toString()
                             }
 
-                            val builder = NotificationCompat.Builder(
-                                applicationContext,
-                                EnkodPushLibrary.CHANEL_Id
-                            )
+                            override fun onError(e: Throwable) {
 
-                            val pendingIntent: PendingIntent = EnkodPushLibrary.getIntent(
-                                applicationContext, message.data, "", url
-                            )
+                                Log.d("onError_one", e.message.toString())
 
-                            builder
+                                startService(message)
 
-                                .setIcon(applicationContext, data["imageUrl"])
-                                //.setColor(applicationContext, data["color"])
-                                .setLights(
-                                    get(variable.ledColor),
-                                    get(variable.ledOnMs),
-                                    get(variable.ledOffMs
+                            }
+
+                            override fun onNext(bitmap: Bitmap?) {
+
+                                EnkodPushLibrary.createNotificationChannel(applicationContext)
+
+                                with(message.data) {
+
+                                    val data = message.data
+
+                                    Log.d("message", data.toString())
+
+
+                                    var url = ""
+
+                                    if (data.containsKey("url") && data[url] != null) {
+                                        url = data["url"].toString()
+                                    }
+
+                                    val builder = NotificationCompat.Builder(
+                                        applicationContext,
+                                        EnkodPushLibrary.CHANEL_Id
                                     )
-                                )
-                                .setVibrate(get(variable.vibrationOn).toBoolean())
-                                .setSound(get(variable.soundOn).toBoolean())
-                                .setContentTitle(data[variable.title])
-                                .setContentText(data[variable.body])
-                                .setContentIntent(pendingIntent)
-                                .setAutoCancel(true)
-                                .addActions(applicationContext, message.data)
-                                .setPriority(NotificationCompat.PRIORITY_MAX)
 
+                                    val pendingIntent: PendingIntent = EnkodPushLibrary.getIntent(
+                                        applicationContext, message.data, "", url
+                                    )
 
-                            if (bitmap != null) {
-
-                                try {
 
                                     builder
-                                        .setLargeIcon(bitmap)
-                                        .setStyle(
-                                            NotificationCompat.BigPictureStyle()
-                                                .bigPicture(bitmap)
-                                                .bigLargeIcon(bitmap)
 
+                                        .setIcon(applicationContext, data["imageUrl"])
+                                        //.setColor(applicationContext, data["color"])
+                                        .setLights(
+                                            get(variable.ledColor),
+                                            get(variable.ledOnMs),
+                                            get(
+                                                variable.ledOffMs
+                                            )
                                         )
-                                } catch (e: Exception) {
+                                        .setVibrate(get(variable.vibrationOn).toBoolean())
+                                        .setSound(get(variable.soundOn).toBoolean())
+                                        .setContentTitle(data[variable.title])
+                                        .setContentText(data[variable.body])
+                                        .setContentIntent(pendingIntent)
+                                        .setAutoCancel(true)
+                                        .addActions(applicationContext, message.data)
+                                        .setPriority(NotificationCompat.PRIORITY_MAX)
 
 
+                                    if (bitmap != null) {
+
+                                        try {
+
+                                            builder
+                                                .setLargeIcon(bitmap)
+                                                .setStyle(
+                                                    NotificationCompat.BigPictureStyle()
+                                                        .bigPicture(bitmap)
+                                                        .bigLargeIcon(bitmap)
+
+                                                )
+                                        } catch (e: Exception) {
+
+
+                                        }
+                                    }
+
+                                    with(NotificationManagerCompat.from(applicationContext)) {
+                                        if (ActivityCompat.checkSelfPermission(
+                                                applicationContext,
+                                                Manifest.permission.POST_NOTIFICATIONS
+                                            ) != PackageManager.PERMISSION_GRANTED
+                                        ) {
+
+                                            return
+                                        }
+
+                                        notify(
+                                            message.data[variable.messageId]!!.toInt(),
+                                            builder.build()
+                                        )
+
+                                    }
                                 }
-                            }
 
-                            with(NotificationManagerCompat.from(applicationContext)) {
-                                if (ActivityCompat.checkSelfPermission(
-                                        applicationContext,
-                                        Manifest.permission.POST_NOTIFICATIONS
-                                    ) != PackageManager.PERMISSION_GRANTED
-                                ) {
-
-                                    return
-                                }
-
-                                notify(message.data[variable.messageId]!!.toInt(), builder.build())
+                                Log.d("onNext", bitmap.toString())
 
                             }
-                        }
+                        })
 
-                        Log.d("onNext", bitmap.toString())
-
-                    }
-                })
-
-        } else {
-            processMessage(this, message, null)
-        }
+                } else {
+                    processMessage(this, message, null)
+                }
 
 
-        initRetrofit()
-        initPreferences(this)
+                initRetrofit()
+                initPreferences(this)
+
 
     }
 
@@ -231,7 +220,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
 
             Log.d("start_service", "start")
 
-            val service = Intent(this, InternetService::class.java)
+            val service = Intent(this, NetworkService::class.java)
             this.startForegroundService(service)
             createdServiceNotification(this, message)
 
@@ -240,221 +229,16 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
             downloadImageToPush(this, message)
 
         }
-
-    }
-
-}
-
-fun isAppInforegrounded(): Boolean {
-    val appProcessInfo = ActivityManager.RunningAppProcessInfo();
-    ActivityManager.getMyMemoryState(appProcessInfo);
-    return (appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
-            appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE)
-}
-
-
-class enkodConnect(_account: String, _tokenUpdate: Boolean = true) : Activity() {
-
-
-    val account: String
-    val tokenUpdate: Boolean
-
-    init {
-        account = _account
-        tokenUpdate = _tokenUpdate
-    }
-
-
-
-    fun start(context: Context) {
-
-        Log.d("start", "start")
-
-        val preferences = context.getSharedPreferences(TAG, MODE_PRIVATE)
-
-        fun refreshInMemoryWorker() {
-
-            val workRequest =
-                PeriodicWorkRequestBuilder<RefreshAppInMemoryWorkManager>(12, TimeUnit.HOURS)
-                    .build()
-
-            WorkManager
-
-                .getInstance(context)
-                .enqueueUniquePeriodicWork(
-                    "refreshInMemoryWorker",
-                    ExistingPeriodicWorkPolicy.UPDATE,
-                    workRequest
-                )
-
-
-            preferences.edit()
-                .putString(WORKER_TAG, "start")
-                .apply()
-
-        }
-
-
-
-        fun startOneTimeWorkerForTokenUpdate() {
-
-            Log.d("doWork", "startOneTime")
-            val workRequest = OneTimeWorkRequestBuilder<OneTimeWorkManager>()
-                //.setInitialDelay(336, TimeUnit.HOURS)
-                .build()
-
-            WorkManager
-                .getInstance(context)
-                .enqueue(workRequest)
-
-        }
-
-
-        var preferencesWorker: String? = preferences.getString(WORKER_TAG, null)
-
-        if (preferencesWorker == null) {
-
-            refreshInMemoryWorker()
-
-        }
-
-        if (preferencesWorker == null && tokenUpdate) {
-
-            startOneTimeWorkerForTokenUpdate()
-
-        }
-
-        if (EnkodPushLibrary.isOnline(context)) {
-
-            isOnlineStatus(1)
-
-            try {
-
-                Log.d("new_token", "token")
-
-                FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
-                    if (!task.isSuccessful) {
-                        Log.w(
-                            ContentValues.TAG,
-                            "Fetching FCM registration token failed",
-                            task.exception
-                        )
-                        return@OnCompleteListener
-                    }
-
-                    val token = task.result
-
-                    EnkodPushLibrary.init(context,account,token)
-
-                })
-
-            } catch (e: Exception) {
-
-                EnkodPushLibrary.init(context, account)
-
-            }
-
-        } else {
-            isOnlineStatus(0)
-            Log.d("Internet", "Интернет отсутствует")
-        }
     }
 }
 
 
-class RefreshAppInMemoryWorkManager(context: Context, workerParameters: WorkerParameters) :
-    Worker(context, workerParameters) {
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    override fun doWork(): Result {
-
-        applicationContext.startForegroundService(
-            Intent(
-                applicationContext,
-                InternetService::class.java
-            )
-        )
-
-        Log.d("doWork", "refreshInMemory")
-
-        return Result.success()
-    }
-}
-
-class UpdateTokenWorker(context: Context, workerParams: WorkerParameters) :
-    CoroutineWorker(context, workerParams) {
-    override suspend fun doWork(): Result {
-
-        val preferences = applicationContext.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-
-        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
-
-        if (preferencesAcc != null) {
-
-            try {
-                Log.d("doWork", "inBlock")
-
-                initRetrofit()
-
-                FirebaseMessaging.getInstance().deleteToken()
-
-                delay(3000)
-
-                FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
-                    if (!task.isSuccessful) {
-                        Log.w(
-                            ContentValues.TAG,
-                            "Fetching FCM registration token failed",
-                            task.exception
-                        )
-                        return@OnCompleteListener
-                    }
-
-                    val token = task.result
 
 
-                    Log.d("doWork", token.toString())
 
-                    EnkodPushLibrary.init(applicationContext, preferencesAcc, token)
 
-                })
 
-            } catch (e: Exception) {
 
-                Log.d("doWork", "error")
-
-            }
-        }
-
-        return Result.success()
-
-    }
-}
-
-class OneTimeWorkManager (context: Context, workerParameters: WorkerParameters) :
-    Worker(context, workerParameters) {
-
-    fun refreshTokenWorker() {
-
-        val workRequest =
-
-            PeriodicWorkRequestBuilder<UpdateTokenWorker>(15, TimeUnit.MINUTES)
-                .build()
-
-        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
-            "refreshToken", ExistingPeriodicWorkPolicy.UPDATE, workRequest
-        );
-    }
-    override fun doWork(): Result {
-
-        Log.d("doWork", "WorkManagerWork")
-
-        refreshTokenWorker()
-
-        return Result.success()
-
-    }
-}
 
 
 
