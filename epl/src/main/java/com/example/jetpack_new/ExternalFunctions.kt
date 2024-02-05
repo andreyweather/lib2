@@ -13,7 +13,7 @@ import androidx.core.app.NotificationCompat
 import com.enkod.enkodpushlibrary.EnkodPushLibrary.defaultIconId
 import java.util.*
 
-val variables = Variables()
+
 internal fun NotificationCompat.Builder.setIcon(context: Context, data: String?): NotificationCompat.Builder {
     fun defaultResID() = context.getResourceFromMeta("com.google.firebase.messaging.default_notification_icon", defaultIconId)
 
@@ -128,15 +128,15 @@ internal fun NotificationChannel.setSound(hasSound: Boolean) {
 internal fun NotificationCompat.Builder.addActions(context: Context, map: Map<String, String>): NotificationCompat.Builder {
     Log.d("addActions", "add")
     for (i in 1 .. 3){
-        if(map.containsKey("${variables.actionButtonText}$i")) {
+        if(map.containsKey("${Variables.actionButtonText}$i")) {
             val intent = EnkodPushLibrary.getIntent(
                 context = context,
                 data = map,
-                field = map["${variables.actionButtonIntent}$i"] ?: "",
-                url = map["${variables.actionButtonsUrl}$i"] ?: ""
+                field = map["${Variables.actionButtonIntent}$i"] ?: "",
+                url = map["${Variables.actionButtonsUrl}$i"] ?: ""
             )
 
-            val text = "${variables.actionButtonText}$i"
+            val text = "${Variables.actionButtonText}$i"
             addAction(0, map[text], intent)
         }
     }

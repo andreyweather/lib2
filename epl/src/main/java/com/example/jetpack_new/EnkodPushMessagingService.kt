@@ -62,8 +62,6 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
         Log.d("onMessageReceived", message.toString())
 
 
-        val variable = Variables()
-
                 val preferences = applicationContext.getSharedPreferences(TAG, MODE_PRIVATE)
 
                 preferences.edit()
@@ -143,16 +141,16 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                         .setIcon(applicationContext, data["imageUrl"])
                                         //.setColor(applicationContext, data["color"])
                                         .setLights(
-                                            get(variable.ledColor),
-                                            get(variable.ledOnMs),
+                                            get(Variables.ledColor),
+                                            get(Variables.ledOnMs),
                                             get(
-                                                variable.ledOffMs
+                                                Variables.ledOffMs
                                             )
                                         )
-                                        .setVibrate(get(variable.vibrationOn).toBoolean())
-                                        .setSound(get(variable.soundOn).toBoolean())
-                                        .setContentTitle(data[variable.title])
-                                        .setContentText(data[variable.body])
+                                        .setVibrate(get(Variables.vibrationOn).toBoolean())
+                                        .setSound(get(Variables.soundOn).toBoolean())
+                                        .setContentTitle(data[Variables.title])
+                                        .setContentText(data[Variables.body])
                                         .setContentIntent(pendingIntent)
                                         .setAutoCancel(true)
                                         .addActions(applicationContext, message.data)
@@ -188,7 +186,7 @@ class EnkodPushMessagingService : FirebaseMessagingService() {
                                         }
 
                                         notify(
-                                            message.data[variable.messageId]!!.toInt(),
+                                            message.data[Variables.messageId]!!.toInt(),
                                             builder.build()
                                         )
 

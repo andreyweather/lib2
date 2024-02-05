@@ -628,10 +628,10 @@ object EnkodPushLibrary {
                 .setIcon(context, data["imageUrl"])
                 //.setColor(context, data["color"])
                 .setLights(
-                    get(variables.ledColor), get(variables.ledOnMs), get(variables.ledOffMs)
+                    get(Variables.ledColor), get(Variables.ledOnMs), get(Variables.ledOffMs)
                 )
-                .setVibrate(get(variables.vibrationOn).toBoolean())
-                .setSound(get(variables.soundOn).toBoolean())
+                .setVibrate(get(Variables.vibrationOn).toBoolean())
+                .setSound(get(Variables.soundOn).toBoolean())
                 .setContentTitle(data["title"])
                 .setContentText(data["body"])
                 .setContentIntent(pendingIntent)
@@ -678,18 +678,6 @@ object EnkodPushLibrary {
 
             }
         }
-    }
-
-    fun exitSelf() {
-
-        exitSelf = 1
-
-    }
-
-    fun createdService () {
-
-        serviceCreated = true
-
     }
 
     fun createdServiceNotification (context: Context, message: RemoteMessage) {
@@ -782,7 +770,7 @@ object EnkodPushLibrary {
                 override fun onNext(t: Bitmap?) {
                     processMessage(context, message, t!!)
                     Log.d("onNext", t.toString())
-                    exitSelf()
+
                 }
             })
     }
@@ -819,7 +807,7 @@ object EnkodPushLibrary {
             }
 
         intent!!.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra(variables.personId, data[variables.personId])
+        intent.putExtra(Variables.personId, data[Variables.personId])
 
         return PendingIntent.getActivity(
             context,
@@ -1013,8 +1001,8 @@ object EnkodPushLibrary {
 
     private fun sendPushClickInfo(extras: Bundle, context: Context) {
         Log.d("intent_lvl", "sendPushClickInfo")
-        variables.personId = "personId"
-        variables.messageId = "messageId"
+        Variables.personId = "personId"
+        Variables.messageId = "messageId"
         url = "url"
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -1040,13 +1028,13 @@ object EnkodPushLibrary {
         initRetrofit()
 
         Log.d("extras", extras.getString(url).toString())
-        Log.d("extras", extras.getString(variables.personId).toString())
+        Log.d("extras", extras.getString(Variables.personId).toString())
         Log.d("extras", messageID.toString())
         Log.d("extras", extras.getString(intentName).toString())
 
         Log.d("sendPushClickInfo", "sendPushClickInfo")
 
-        if (extras.getString(variables.personId) != null && extras.getString(variables.messageId) != null) {
+        if (extras.getString(Variables.personId) != null && extras.getString(Variables.messageId) != null) {
 
             Log.d("sendPushClickInfo", "sendPushClickInfo_no_null")
             retrofit.pushClick(
@@ -1054,7 +1042,7 @@ object EnkodPushLibrary {
                 PushClickBody(
 
                     sessionId = sessionId!!,
-                    personId = extras.getString(variables.personId, "0").toInt(),
+                    personId = extras.getString(Variables.personId, "0").toInt(),
                     messageId = messageID.toInt(),
                     intent = extras.getString(intentName, "2").toInt(),
                     url = extras.getString(url)

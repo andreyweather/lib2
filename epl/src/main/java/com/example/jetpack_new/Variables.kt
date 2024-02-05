@@ -1,6 +1,6 @@
 package com.enkod.enkodpushlibrary
 
-class Variables {
+object Variables {
 
     internal var soundOn ="hasSound"
     internal var vibrationOn = "hasVibro"

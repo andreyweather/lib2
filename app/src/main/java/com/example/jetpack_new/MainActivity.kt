@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
         val product = Product("id1", "TS", 1, "1000","")
 
         enkodConnect("andrey_pogodin3").start(this)
-        EnkodPushLibrary.addContact("fcm_a32_5@gmail.com")
+        EnkodPushLibrary.addContact("fcm_a32_6@gmail.com")
         EnkodPushLibrary.AddToFavourite(product)
 
         }
