@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.enkod.enkodpushlibrary"
+    namespace = "com.enkod.jetpack_new"
     compileSdk = 34
 
     defaultConfig {
