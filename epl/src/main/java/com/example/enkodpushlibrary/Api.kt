@@ -20,6 +20,11 @@ interface Api {
         @Body subscribeBody: SubscribeBody,
     ): Call<UpdateTokenResponse>
 
+    @GET("mobile/token")
+    fun getToken(
+        @Header("X-Account") client: String,
+        @Query("session") session: String,
+    ): Call<GetTokenResponse>
 
     @POST("mobile/subscribe")
     @Headers("Content-Type: application/json")
@@ -29,26 +34,25 @@ interface Api {
         @Body subscribeBody: SubscribeBody
     ): Call<UpdateTokenResponse>
 
-    @POST("mobile/unsubscribe")
-    @Headers("Content-Type: application/json")
-    fun unSubscribeToPushToken(
-        @Header("X-Account")client:String,
-        @Header("X-Session-Id") session:String
-    ): Call<UpdateTokenResponse>
-
 
     @POST("mobile/click")
     @Headers("Content-Type: application/json")
     fun pushClick(
         @Header("X-Account")client:String,
         @Body pushClickBody: PushClickBody
-    ): Call<UpdateTokenResponse>
+    ): Call<PushClickBody>
+
 
     @POST("/subscribe")
     fun subscribe(@Header("X-Account")client:String,
                   @Header("X-Session-Id")session:String,
                   @Body subscribeBody:JsonObject)
     : Call<Unit>
+
+    @PUT("updateBySession")
+    fun updateContacts(@Header("X-Account") client: String,
+                       @Header("X-Session-Id") session: String,
+                       @QueryMap(encoded = true) params: Map<String, String>):Call<Unit>
 
 
     @POST("/mobile/product/cart")
@@ -57,11 +61,6 @@ interface Api {
                   @Body body:JsonObject)
             : Call<Unit>
 
-    @POST("/mobile/product/cart")
-    fun removeFromCart(@Header("X-Account")client:String,
-                       @Header("X-Session-Id")session:String,
-                       @Body body:JsonObject)
-            : Call<Unit>
 
     @POST("/mobile/product/favourite")
     fun addToFavourite(@Header("X-Account")client:String,
@@ -69,18 +68,6 @@ interface Api {
                   @Body body:JsonObject)
     : Call<Unit>
 
-    @POST("/mobile/product/favourite")
-
-    fun removeFromFavourite(@Header("X-Account")client:String,
-                       @Header("X-Session-Id")session:String,
-                       @Body body:JsonObject)
-    : Call<Unit>
-
-    @POST("addExtraFields")
-    fun addExtrafields(@Header("X-Account")client:String,
-                            @Header("X-Session-Id")session:String,
-                            @Body body:JsonObject)
-    : Call<Unit>
 
     @POST("/mobile/page/open")
     fun pageOpen(@Header("X-Account")client:String,
@@ -100,33 +87,8 @@ interface Api {
                     @Body body:JsonObject)
             : Call<Unit>
 
-    @GET("getCartAndFavourite")
-    fun checkPerson(@Header("X-Account") client: String,
-                    @Header("X-Session-Id") session: String,
-                    @QueryMap(encoded = true) params: Map<String, String>)
-    : Call<PersonResponse>
 
-    @PUT("updateBySession")
-    fun updateContacts(@Header("X-Account") client: String,
-                       @Header("X-Session-Id") session: String,
-                       @QueryMap(encoded = true) params: Map<String, String>):Call<Unit>
-
-//    @GET("https://ext.enkod.ru/mobile/check")
-//    fun checkSubscription(
-//        @Header("X-Account") client: String,
-//        @Header("X-Session-Id") session: String):Call<Boolean>
 }
 
-data class PushClickBody(
-    val sessionId: String,
-    val personId: Int,
-    val messageId: Int,
-    val intent: Int,
-    val url: String?
-)
 
-data class SubscribeBody(
-    val sessionId: String,
-    val token: String,
-    val os: String? = null
-)
+

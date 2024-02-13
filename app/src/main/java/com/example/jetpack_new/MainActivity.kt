@@ -3,9 +3,9 @@ package com.example.jetpack_new
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.enkod.enkodpushlibrary.EnkodConnect
 import com.enkod.enkodpushlibrary.EnkodPushLibrary
 import com.enkod.enkodpushlibrary.Product
-import com.enkod.enkodpushlibrary.enkodConnect
 import com.example.jetpack_new.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -16,11 +16,15 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.logOut.setOnClickListener {
+            EnkodPushLibrary.logOut(this)
+        }
+
         val product = Product("id1", "TS", 1, "1000","")
 
-        enkodConnect("andrey_pogodin3").start(this)
-        EnkodPushLibrary.addContact("fcm_a32_6@gmail.com")
-        EnkodPushLibrary.AddToFavourite(product)
+        EnkodConnect("andrey_pogodin3", false).start(this)
+        EnkodPushLibrary.addContact("fcm_a32_9@gmail.com")
+        EnkodPushLibrary.addToFavourite(product)
 
         }
     }

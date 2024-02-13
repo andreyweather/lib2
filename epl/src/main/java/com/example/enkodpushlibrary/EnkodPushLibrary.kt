@@ -1,7 +1,6 @@
 package com.enkod.enkodpushlibrary
 
 import android.Manifest
-import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -23,15 +23,21 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.bundleOf
+import androidx.work.WorkManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
 import com.example.jetpack_new.R
+import com.google.android.gms.tasks.OnCompleteListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
@@ -59,18 +65,20 @@ object EnkodPushLibrary {
     private const val TOKEN_TAG: String = "${TAG}_TOKEN"
     private const val ACCOUNT_TAG: String = "${TAG}_ACCOUNT"
     private const val MESSAGEID_TAG = "${TAG}_MESSAGEID"
+    private const val WORKER_TAG = "${TAG}_WORKER"
+    private const val START_TIMER_TAG = "${TAG}_STARTTIMER"
+    private const val TIME_TAG  = "${TAG}_TIME"
+
+
 
     private val initLibObserver = InitLibObserver(false)
-    internal val notificationCreatedObserver = NotificationCreatedObserver(false)
-    internal val tokenUpdateObserver = TokenUpdateObserver(false)
-    internal val startServiceObserver = StartServiceObserver (false)
-    internal val refreshAppInMemoryObserver = RefreshAppInMemoryObserver (false)
 
     internal val CHANEL_Id = "enkod_lib_1"
     internal var exit = 0
     internal var exitSelf = 0
     internal var serviceCreated = false
     internal var isOnline = true
+    internal var addContactAccess = false
 
 
     internal var account: String? = null
@@ -79,7 +87,6 @@ object EnkodPushLibrary {
 
     internal var intentName = "intent"
     internal var url: String = "url"
-
 
     internal val vibrationPattern = longArrayOf(1500, 500)
     internal val defaultIconId: Int = R.drawable.ic_android_black_24dp
@@ -94,8 +101,6 @@ object EnkodPushLibrary {
     internal lateinit var retrofit: Api
     private lateinit var client: OkHttpClient
 
-
-    // класс необходим для правильной работы библиотеки retrofit
 
     class NullOnEmptyConverterFactory : Converter.Factory() {
         override fun responseBodyConverter(
@@ -114,7 +119,6 @@ object EnkodPushLibrary {
         }
     }
 
-    // класс перечислений (OpenIntent) необходим для обработки нажатия на push
 
     enum class OpenIntent {
         DYNAMIC_LINK, OPEN_URL, OPEN_APP;
@@ -141,9 +145,21 @@ object EnkodPushLibrary {
         }
     }
 
+  internal fun initPreferences(context: Context) {
+
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+
+        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
+        var preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
+        var preferencesToken = preferences.getString(TOKEN_TAG, null)
 
 
-    // функция (initRetrofit) инициализации библиотеки retrofit - выполняющую http запросы
+        this.sessionId = preferencesSessionId
+        this.token = preferencesToken
+        this.account = preferencesAcc
+
+    }
+
 
     internal fun initRetrofit() {
 
@@ -173,21 +189,6 @@ object EnkodPushLibrary {
 
     }
 
-    internal fun initPreferences(context: Context) {
-
-        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
-
-        var preferencesAcc = preferences.getString(ACCOUNT_TAG, null)
-        var preferencesSessionId = preferences.getString(SESSION_ID_TAG, null)
-        var preferencesToken = preferences.getString(TOKEN_TAG, null)
-
-
-        this.sessionId = preferencesSessionId
-        this.token = preferencesToken
-        this.account = preferencesAcc
-
-
-    }
 
     internal fun init (context: Context, account: String, token: String? = null) {
 
@@ -207,6 +208,7 @@ object EnkodPushLibrary {
             }
 
             else -> {
+
 
                 if (this.token == token && !sessionId.isNullOrEmpty()) {
 
@@ -244,10 +246,6 @@ object EnkodPushLibrary {
         }
     }
 
-    /* функция (getSessionIdFromApi) получения новой сессии (session_Id)
-       запускает функцию (newSessions) сохранения новой сессии.
-   */
-
     private fun getSessionIdFromApi(ctx: Context) {
 
         Log.d("lib_lvl", "getSessionIdFromApi")
@@ -276,16 +274,13 @@ object EnkodPushLibrary {
         })
     }
 
-    /* функция (newSessions) сохранения  новой сессии (session_Id)
-      запускает функцию (updateToken) которая создает запись о текущей сессии и токене на сервисе.
-    */
 
-    private fun newSessions(context: Context, nsession: String?) {
+    private fun newSessions(ctx: Context, nsession: String?) {
 
         Log.d("lib_lvl", "newSessions")
 
 
-        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         var newPreferencesToken = preferences.getString(TOKEN_TAG, null)
 
         preferences.edit()
@@ -305,9 +300,6 @@ object EnkodPushLibrary {
 
     }
 
-    /* функция (updateToken) создает запись о текущей сессии и токене на сервисе
-     запускает функцию (subscribeToPush) которая подключает контакт к push уведомлениям.
-    */
 
      private fun updateToken(session: String?, token: String?) {
 
@@ -367,8 +359,6 @@ object EnkodPushLibrary {
     }
 
 
-    //  функция (subscribeToPush) подключает контакт к push уведомлениям.
-
     private fun subscribeToPush(client: String?, session: String?, token: String?) {
 
         var c = ""
@@ -396,23 +386,22 @@ object EnkodPushLibrary {
                 call: Call<UpdateTokenResponse>,
                 response: Response<UpdateTokenResponse>
             ) {
+                logInfo("subscribed")
 
+                addContactAccess = true
                 initLibObserver.value = true
-                tokenUpdateObserver.value = true
-
 
             }
 
             override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
                 logInfo("MESSAGE ${t.localizedMessage}")
-                //callback("failure")
+
             }
 
         })
     }
 
 
-    // функция (addContact) создания и добавления нового контакта на сервис
 
     fun addContact(
 
@@ -422,12 +411,11 @@ object EnkodPushLibrary {
 
         extrafileds: Map<String, String>? = null
 
-
     ) {
 
         initLibObserver.observable.subscribe {
 
-            if(it) {
+            if (it) {
 
                 if (isOnline) {
 
@@ -500,9 +488,34 @@ object EnkodPushLibrary {
         }
     }
 
-    fun isOnlineStatus (status: Int) {
-        if (status == 1) isOnline = true
-        else isOnline = false
+    fun UpdateContacts(email: String, phone: String) {
+        val params = hashMapOf<String, String>()
+        if (email.isNotEmpty()) {
+            params.put("email", email)
+        }
+        if (phone.isNotEmpty()) {
+            params.put("phone", phone)
+        }
+
+        retrofit.updateContacts(
+            getClientName(),
+            getSession(),
+            params
+        ).enqueue(object : Callback<Unit> {
+            override fun onResponse(call: Call<Unit>, response: Response<Unit>) {
+
+            }
+
+            override fun onFailure(call: Call<Unit>, t: Throwable) {
+
+                onErrorCallback("Error when updating: ${t.localizedMessage}")
+            }
+        })
+        return
+    }
+
+    fun isOnlineStatus (status: Boolean) {
+        isOnline = status
     }
 
     fun isOnline(context: Context): Boolean {
@@ -527,14 +540,13 @@ object EnkodPushLibrary {
         return false
     }
 
-    // функция (getClientName) возвращает имя клиента Enkod
+
 
     private fun getClientName(): String {
         Log.d("Library", "getClientName ${this.account}")
         return this.account!!
     }
 
-    // функция (getSession) private возвращает значение сессии
 
     private fun getSession(): String {
 
@@ -542,6 +554,7 @@ object EnkodPushLibrary {
             Log.d("getSession", " $sessionId")
             this.sessionId!!
         } else ""
+
     }
 
     fun getSessionFromLibrary(context: Context): String {
@@ -562,19 +575,25 @@ object EnkodPushLibrary {
     }
 
 
-    // функция (logOut) уничтожения текущей сессии
-
-    fun logOut(ctx: Context) {
+    fun logOut(context: Context) {
         FirebaseMessaging.getInstance().deleteToken();
-        val preferences = ctx.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
         preferences.edit().remove(SESSION_ID_TAG).apply()
         preferences.edit().remove(TOKEN_TAG).apply()
+        preferences.edit().remove(WORKER_TAG).apply()
+        preferences.edit().remove(START_TIMER_TAG).apply()
+        preferences.edit().remove(TIME_TAG).apply()
+
         sessionId = ""
         token = ""
+        WorkManager.getInstance(context).cancelUniqueWork("refreshInMemoryWorker")
+        WorkManager.getInstance(context).cancelUniqueWork("refreshToken")
+        WorkManager.getInstance(context).cancelUniqueWork("verificationOfTokenWorker")
+
+        initLibObserver.value = false
+
     }
 
-
-    // функция (logInfo) создания тегов для отладки
 
     internal fun logInfo(msg: String) {
         Log.d("Library", "logInfo + ${msg}")
@@ -591,8 +610,25 @@ object EnkodPushLibrary {
     }
 
 
-    // функции (createNotificationChannel) и (createNotification) создают и показывают push уведомления
+    @RequiresApi(Build.VERSION_CODES.O)
+    internal fun createdNotificationForNetworkService(context: Context): Notification {
 
+        val CHANNEL_ID = "my_channel_service"
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Channel",
+            NotificationManager.IMPORTANCE_MIN
+        )
+        (context.getSystemService(Service.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(
+            channel
+        )
+
+        val notification: Notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setContentTitle("")
+            .setContentText("").build()
+
+        return notification
+    }
 
 
 
@@ -628,12 +664,13 @@ object EnkodPushLibrary {
                 .setIcon(context, data["imageUrl"])
                 //.setColor(context, data["color"])
                 .setLights(
-                    get(Variables.ledColor), get(Variables.ledOnMs), get(Variables.ledOffMs)
+                    get(variables.ledColor), get(variables.ledOnMs), get(variables.ledOffMs)
                 )
-                .setVibrate(get(Variables.vibrationOn).toBoolean())
-                .setSound(get(Variables.soundOn).toBoolean())
+                .setVibrate(get(variables.vibrationOn).toBoolean())
+                .setSound(get(variables.soundOn).toBoolean())
                 .setContentTitle(data["title"])
                 .setContentText(data["body"])
+                .setColor(Color.BLACK)
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .addActions(context, message.data)
@@ -672,44 +709,41 @@ object EnkodPushLibrary {
 
                 notify(message.data["messageId"]!!.toInt(), builder.build())
 
-                notificationCreatedObserver.value = true
-
                 exit = 1
 
             }
         }
     }
 
-    fun createdServiceNotification (context: Context, message: RemoteMessage) {
+    fun exitSelf() {
 
-        startServiceObserver.observable.subscribe {
+        exitSelf = 1
 
-            if (it) {
-
-                downloadImageToPush(context, message)
-
-            }
-        }
     }
 
-   @RequiresApi(Build.VERSION_CODES.O)
-   internal fun createdNotificationForNetworkService (context: Context): Notification {
+    fun createdService () {
 
-            val CHANNEL_ID = "my_channel_service"
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Channel",
-                NotificationManager.IMPORTANCE_MIN
-            )
-            (context.getSystemService(Service.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(
-                channel
-            )
+        serviceCreated = true
 
-            val notification: Notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setContentTitle("")
-                .setContentText("").build()
+    }
 
-       return notification
+    fun createdServiceNotification (context: Context, message: RemoteMessage) {
+
+        var observer = true
+
+        CoroutineScope(Dispatchers.IO).launch {
+            while (observer) {
+
+                delay(100)
+
+                if (serviceCreated) {
+                    delay(3000)
+                    Log.d("service_state", "push")
+                    downloadImageToPush(context, message)
+                    observer = false
+                }
+            }
+        }
     }
 
     fun createNotificationChannel(context: Context) {
@@ -770,19 +804,10 @@ object EnkodPushLibrary {
                 override fun onNext(t: Bitmap?) {
                     processMessage(context, message, t!!)
                     Log.d("onNext", t.toString())
-
+                    exitSelf()
                 }
             })
     }
-
-    fun isAppInforegrounded(): Boolean {
-        val appProcessInfo = ActivityManager.RunningAppProcessInfo();
-        ActivityManager.getMyMemoryState(appProcessInfo);
-        return (appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
-                appProcessInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE)
-    }
-
-    // функция (getIntent) определяет какой вид действия должен быть совершен после нажатия на push
 
     internal fun getIntent(
         context: Context,
@@ -790,7 +815,7 @@ object EnkodPushLibrary {
         field: String,
         url: String
     ): PendingIntent {
-        Log.d("intent_lvl", "getIntent")
+
         Log.d("message_info", "${data["intent"].toString()} ${field.toString()}")
         val intent =
             if (field == "1") {
@@ -807,7 +832,7 @@ object EnkodPushLibrary {
             }
 
         intent!!.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        intent.putExtra(Variables.personId, data[Variables.personId])
+        intent.putExtra(variables.personId, data[variables.personId])
 
         return PendingIntent.getActivity(
             context,
@@ -818,7 +843,6 @@ object EnkodPushLibrary {
     }
 
     internal fun getOpenAppIntent(context: Context): Intent {
-        Log.d("intent_lvl", "getOpenAppIntent")
         Log.d("Library", "getOpenAppIntent")
         return Intent(context, OnOpenActivity::class.java).also {
             it.putExtras(
@@ -832,7 +856,8 @@ object EnkodPushLibrary {
 
     // функция (getPackageLauncherIntent) создает намерение которое открывает приложение при нажатии на push
     internal fun getPackageLauncherIntent(context: Context): Intent? {
-        Log.d("intent_lvl", "getPackageLauncherIntent")
+
+        Log.d("package_intent", "getPackageLauncherIntent")
         val pm: PackageManager = context.packageManager
         return pm.getLaunchIntentForPackage(context.packageName).also {
             val bundle = (
@@ -844,17 +869,12 @@ object EnkodPushLibrary {
         }
     }
 
-    /* функция (getDynamicLinkIntent) создает намерение которое открывает динамическую ссылку
-       в приложении при нажатии на push (переход к определенной страннице приложения)
-     */
-
     private fun getDynamicLinkIntent(
         context: Context,
         data: Map<String, String>,
         URL: String
     ): Intent {
         if (URL != "null") {
-            Log.d("intent_lvl", "getDynamicLinkIntent")
             return Intent(context, OnOpenActivity::class.java).also {
                 it.putExtras(
                     bundleOf(
@@ -866,7 +886,6 @@ object EnkodPushLibrary {
             }
 
         } else {
-            Log.d("intent_lvl", "getDynamicLinkIntent")
             return Intent(context, OnOpenActivity::class.java).also {
                 it.putExtras(
                     bundleOf(
@@ -879,12 +898,9 @@ object EnkodPushLibrary {
         }
     }
 
-    /* функция (getOpenUrlIntent) создает намерение которое открывает внешнию http ссылку
-      при нажатии на push (переход на сайт)
-    */
 
     private fun getOpenUrlIntent(context: Context, data: Map<String, String>, URL: String): Intent {
-        Log.d("intent_lvl", "getDynamicLinkIntent")
+        Log.d("Library", "getOpenUrlIntent")
         if (URL != "null") {
             return Intent(context, OnOpenActivity::class.java).also {
                 it.putExtras(
@@ -897,7 +913,6 @@ object EnkodPushLibrary {
             }
         } else {
             logInfo("GET INTENT ${OpenIntent.get(data[intentName])} ${data[intentName]} ${data[url]}")
-            Log.d("intentName", intentName.toString())
             return Intent(context, OnOpenActivity::class.java).also {
                 it.putExtra(intentName, OpenIntent.OPEN_URL.get())
                 it.putExtra(url, data[url])
@@ -914,8 +929,6 @@ object EnkodPushLibrary {
     }
 
 
-    // функция (setClientName) сохраняет значение имени клиента Enkod
-
     private fun setClientName(context: Context, acc: String) {
         Log.d("Library", "setClientName ${acc.toString()}")
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
@@ -927,9 +940,6 @@ object EnkodPushLibrary {
         this.account = acc
     }
 
-    /* функция (getResourceId) получает получить данные с сообщения передаваемого с сервиса
-    для дальнейшего создания push
-     */
 
     internal fun getResourceId(
         context: Context,
@@ -937,7 +947,7 @@ object EnkodPushLibrary {
         resName: String?,
         pPackageName: String?
     ): Int {
-        Log.d("intent_lvl", "getResourceId")
+        Log.d("Library", "getResourceId")
         return try {
             context.resources.getIdentifier(pVariableName, resName, pPackageName)
         } catch (e: Exception) {
@@ -946,16 +956,11 @@ object EnkodPushLibrary {
         }
     }
 
-    // функция (getBitmapFromUrl) требуется для открытия изображения в push уведомлении
 
     internal fun onDeletedMessage() {
         Log.d("Library", "onDeletedMessage")
         onDeletedMessage.invoke()
     }
-
-    /* функции (set), (handleExtras), (sendPushClickInfo)  требуются для установки значений
-    для отображения push уведомлений
-     */
 
     internal fun set(hasVibration: Boolean): LongArray {
         Log.d("Library", "set_vibrationPattern")
@@ -968,7 +973,6 @@ object EnkodPushLibrary {
 
     fun handleExtras(context: Context, extras: Bundle) {
         val link = extras.getString(url)
-        Log.d("intent_lvl", "handleExtras  $link")
         Log.d("handleExtras", "handleExtras ${extras.getString("messageId")}")
         sendPushClickInfo(extras, context)
         when (OpenIntent.get(extras.getString(intentName))) {
@@ -997,13 +1001,10 @@ object EnkodPushLibrary {
         }
     }
 
-
-
     private fun sendPushClickInfo(extras: Bundle, context: Context) {
+
         Log.d("intent_lvl", "sendPushClickInfo")
-        Variables.personId = "personId"
-        Variables.messageId = "messageId"
-        url = "url"
+
 
         val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
 
@@ -1012,72 +1013,80 @@ object EnkodPushLibrary {
         var preferencesToken = preferences.getString(TOKEN_TAG, null)
         var preferencesMessageId = preferences.getString(MESSAGEID_TAG, null)
 
-
-        var messageID = ""
-
-        when (preferencesMessageId) {
-            null ->  messageID = "-1"
-            else ->  messageID = preferencesMessageId
-        }
-
-
         this.sessionId = preferencesSessionId!!
         this.token = preferencesToken!!
         this.account = preferencesAcc!!
 
+
+        var sessionID = ""
+        var personID = extras.getString(Variables.personId, "0").toInt()
+        var messageID = -1
+        var intent = extras.getString(intentName, "2").toInt()
+        val url = extras.getString(url)
+
+        when (preferencesMessageId) {
+            null -> messageID = -1
+            else -> messageID = preferencesMessageId.toInt()
+        }
+
+        when (preferencesSessionId) {
+            null -> sessionID = ""
+            else -> sessionID = preferencesSessionId
+        }
+
+
         initRetrofit()
 
-        Log.d("extras", extras.getString(url).toString())
-        Log.d("extras", extras.getString(Variables.personId).toString())
-        Log.d("extras", messageID.toString())
-        Log.d("extras", extras.getString(intentName).toString())
 
-        Log.d("sendPushClickInfo", "sendPushClickInfo")
+        Log.d("sendPushClickInfo", "$sessionID, ${personID}, ${messageID}, ${intent}, $url")
 
-        if (extras.getString(Variables.personId) != null && extras.getString(Variables.messageId) != null) {
 
-            Log.d("sendPushClickInfo", "sendPushClickInfo_no_null")
-            retrofit.pushClick(
-                getClientName(),
-                PushClickBody(
+        retrofit.pushClick(
+            getClientName(),
+            PushClickBody(
 
-                    sessionId = sessionId!!,
-                    personId = extras.getString(Variables.personId, "0").toInt(),
-                    messageId = messageID.toInt(),
-                    intent = extras.getString(intentName, "2").toInt(),
-                    url = extras.getString(url)
+                sessionId = sessionID,
+                personId = personID,
+                messageId = messageID,
+                intent = intent,
+                url = url
 
-                )
-            ).enqueue(object : Callback<UpdateTokenResponse> {
+            )
+        ).enqueue(object : Callback<PushClickBody> {
 
-                override fun onResponse(
-                    call: Call<UpdateTokenResponse>,
-                    response: Response<UpdateTokenResponse>
-                ) {
-                    val msg = "succsess"
-                    Log.d("sendPushClickInfo", "succsess")
-                    logInfo(msg)
-                    onPushClickCallback(extras, msg)
-                }
 
-                override fun onFailure(call: Call<UpdateTokenResponse>, t: Throwable) {
-                    val msg = "failure"
-                    logInfo(msg)
-                    onPushClickCallback(extras, msg)
+            override fun onResponse(
+                call: Call<PushClickBody>,
+                response: Response<PushClickBody>
+            ) {
+                val msg = "succsess"
 
-                }
-            })
-        }
+                response.code()
+                Log.d("sendPushClickInfo", response.code().toString())
+
+                onPushClickCallback(extras, msg)
+            }
+
+            override fun onFailure(call: Call<PushClickBody>, t: Throwable) {
+
+                val msg = "failure"
+                Log.d("sendPushClickInfo", "failure $t")
+                logInfo(msg)
+                onPushClickCallback(extras, msg)
+
+            }
+        })
+
     }
 
 
+
     // функция (RemoveFromFavourite) фиксирует событые добавления в корзину
-    fun AddToCart(product: Product) {
+    fun addToCart(product: Product) {
 
         initLibObserver.observable.subscribe {
 
             if (it) {
-
 
                 if (!product.id.isNullOrEmpty()) {
 
@@ -1142,7 +1151,7 @@ object EnkodPushLibrary {
     }
 
     // функция (RemoveFromFavourite) фиксирует событые удаления из корзины
-    fun RemoveFromCart(product: Product) {
+    fun removeFromCart(product: Product) {
 
         initLibObserver.observable.subscribe {
 
@@ -1210,7 +1219,7 @@ object EnkodPushLibrary {
     }
 
     // функция (RemoveFromFavourite) фиксирует событые добавления из избранное
-    fun AddToFavourite(product: Product) {
+    fun addToFavourite(product: Product) {
 
         initLibObserver.observable.subscribe {
 
@@ -1235,7 +1244,6 @@ object EnkodPushLibrary {
 
                     history.addProperty("action", "productLike")
                     property = "wishlist"
-
 
 
                     req = JsonObject().apply {
@@ -1280,9 +1288,9 @@ object EnkodPushLibrary {
         }
     }
 
-    // функция (RemoveFromFavourite) фиксирует событые удаления из избранного
+// функция (RemoveFromFavourite) фиксирует событые удаления из избранного
 
-    fun RemoveFromFavourite(product: Product) {
+    fun removeFromFavourite(product: Product) {
 
         initLibObserver.observable.subscribe {
 
@@ -1350,9 +1358,7 @@ object EnkodPushLibrary {
     }
 
 
-
-
-    // функция (productBuy) для передачи информации о покупках на сервис
+// функция (productBuy) для передачи информации о покупках на сервис
 
     fun productBuy(order: Order) {
 
@@ -1421,9 +1427,9 @@ object EnkodPushLibrary {
         }
     }
 
-    // функция (ProductOpen) для передаци информации об открытии товаров на сервис
+// функция (ProductOpen) для передаци информации об открытии товаров на сервис
 
-    fun ProductOpen(product: Product) {
+    fun productOpen(product: Product) {
         initLibObserver.observable.subscribe {
 
             if (it) {
@@ -1482,43 +1488,162 @@ class InitLibObserver<T>(private val defaultValue: T) {
     val observable = BehaviorSubject.create<T>(value)
 }
 
-class NotificationCreatedObserver<T>(private val defaultValue: T) {
-    var value: T = defaultValue
-        set(value) {
-            field = value
-            observable.onNext(value)
+
+
+ class EnkodConnect(
+
+    _account: String,
+    _tokenUpdate: Boolean? = false,
+    _refreshAppInMemory: Boolean? = false,
+    _timeTokenUpdate: Int? = 336,
+    _timeRefreshAppInMemory: Long? = 12
+
+) {
+
+    private val account: String
+    private val tokenUpdate: Boolean?
+    private val refreshAppInMemory: Boolean?
+    private var timeTokenUpdate: Int?
+    private var timeRefreshAppInMemory: Long?
+
+    init {
+
+        account = _account
+        tokenUpdate = _tokenUpdate
+        refreshAppInMemory = _refreshAppInMemory
+        timeTokenUpdate = _timeTokenUpdate
+        timeRefreshAppInMemory = _timeRefreshAppInMemory
+
+    }
+
+    private val TAG = "EnkodPushLibrary"
+    private val WORKER_TAG: String = "${TAG}_WORKER"
+    private val START_TIMER_TAG: String = "${TAG}_STARTTIMER"
+    private val TIME_TAG: String = "${TAG}_TIME"
+
+    fun start(context: Context) {
+
+
+        Log.d(
+            "EnkodConnect_options",
+            "account $account, tokenUpdate $tokenUpdate, refreshAppInMemory $refreshAppInMemory, timeTokenUpdate $timeTokenUpdate, timeRefreshAppInMemory $timeRefreshAppInMemory"
+        )
+
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        var preferencesWorker = preferences.getString(WORKER_TAG, null)
+        var preferencesStartTimer = preferences.getString(START_TIMER_TAG, null)
+
+
+
+        if (preferencesStartTimer == null) {
+
+            preferences.edit()
+                .putLong(TIME_TAG, System.currentTimeMillis())
+                .apply()
+
+            preferences.edit()
+                .putString(START_TIMER_TAG, "start")
+                .apply()
+
         }
-    val observable = BehaviorSubject.create<T>(value)
-}
 
+        if (preferencesWorker == null && refreshAppInMemory != null && refreshAppInMemory) {
 
-class TokenUpdateObserver<T>(private val defaultValue: T) {
-    var value: T = defaultValue
-        set(value) {
-            field = value
-            observable.onNext(value)
+            BackgroundTasks(context).refreshInMemoryWorker(timeRefreshAppInMemory!!)
+
         }
-    val observable = BehaviorSubject.create<T>(value)
-}
 
-class StartServiceObserver<T>(private val defaultValue: T) {
-    var value: T = defaultValue
-        set(value) {
-            field = value
-            observable.onNext(value)
+        if (preferencesWorker == null && tokenUpdate != null && tokenUpdate) {
+
+            // BackgroundTasks(context).startOneTimeWorkerForTokenUpdate()
+
         }
-    val observable = BehaviorSubject.create<T>(value)
-}
 
-class RefreshAppInMemoryObserver<T>(private val defaultValue: T) {
-    var value: T = defaultValue
-        set(value) {
-            field = value
-            observable.onNext(value)
+        if (EnkodPushLibrary.isOnline(context)) {
+
+            EnkodPushLibrary.isOnlineStatus(true)
+
+            try {
+
+                FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
+                    if (!task.isSuccessful) {
+                        Log.d(
+                            "new_token",
+                            "Fetching FCM registration token failed",
+                            task.exception
+                        )
+                        return@OnCompleteListener
+                    }
+
+                    val token = task.result
+
+                    EnkodPushLibrary.init(context, account, token)
+
+                })
+
+            } catch (e: Exception) {
+
+                EnkodPushLibrary.init(context, account)
+
+            }
+
+        } else {
+            EnkodPushLibrary.isOnlineStatus(false)
+            Log.d("Internet", "Интернет отсутствует")
         }
-    val observable = BehaviorSubject.create<T>(value)
-}
 
+        if (tokenUpdate != null && tokenUpdate && timeTokenUpdate != null) {
+
+
+            tokenUpdate(context, timeTokenUpdate!!)
+
+
+        }
+    }
+
+    private fun tokenUpdate(context: Context, timeInHours: Int) {
+
+        Log.d ("tokenUpdate", "Start")
+
+        val timeUpdateInMillis: Long = (timeInHours * 3600000).toLong()
+
+        val preferences = context.getSharedPreferences(TAG, Context.MODE_PRIVATE)
+        val preferencesTime = preferences.getLong(TIME_TAG, 1)
+
+        Log.d ("tokenUpdate", (System.currentTimeMillis() - preferencesTime).toString())
+
+        if (isAppInforegrounded()) {
+
+            if (EnkodPushLibrary.isOnline(context)) {
+
+                if ((System.currentTimeMillis() - preferencesTime) > timeUpdateInMillis) {
+
+
+
+                    Log.d ("tokenUpdate", "Update")
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(
+                            Intent(
+                                context,
+                                UpdateTokenService::class.java
+                            )
+                        )
+                    }
+
+
+                    preferences.edit()
+                        .remove(TIME_TAG).apply()
+
+                    preferences.edit()
+                        .putLong(TIME_TAG, System.currentTimeMillis())
+                        .apply()
+
+                }
+            }
+        }
+    }
+}
 
 
 

@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_SERVICE" />
 
     <application
         android:directBootAware="true"
@@ -15,7 +16,33 @@
         android:usesCleartextTraffic="true">
 
         <service
-            android:name=".NetworkService"
+            android:name="com.enkod.enkodpushlibrary.RefreshAppInMemoryService"
+            android:enabled="true"
+            android:exported="false"
+            android:usesCleartextTraffic="true"
+            android:foregroundServiceType = "dataSync"
+            />
+
+        <service
+            android:name="com.enkod.enkodpushlibrary.VerificationTokenService"
+            android:enabled="true"
+            android:exported="false"
+            android:usesCleartextTraffic="true"
+            android:foregroundServiceType = "dataSync"
+            android:directBootAware = "true"
+            />
+
+        <service
+            android:name="com.enkod.enkodpushlibrary.UpdateTokenService"
+            android:enabled="true"
+            android:exported="false"
+            android:usesCleartextTraffic="true"
+            android:foregroundServiceType = "dataSync"
+            android:directBootAware = "true"
+            />
+
+        <service
+            android:name="com.enkod.enkodpushlibrary.InternetService"
             android:enabled="true"
             android:exported="true" />
 
