@@ -3,11 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("maven-publish")
 
+
 }
 
 android {
     namespace = "com.example.enkodpushlibrary"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 24
@@ -73,7 +74,7 @@ publishing {
     publications {
         register<MavenPublication>("release") {
             groupId = "com.github.AndreyWeather"
-            artifactId = "enkodpushlibrary"
+            artifactId = "jetpack-new"
             version = "0.0.1"
 
             afterEvaluate {
